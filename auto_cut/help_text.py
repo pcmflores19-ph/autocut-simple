@@ -6,7 +6,7 @@ it - for anyone who gets a built copy rather than the repository, this is the
 only documentation there is.
 """
 
-from version import APP_NAME, PROJECT_URL, __version__
+from version import APP_NAME, SOURCE_CONTACT, __version__
 
 QUICK_START = """\
 WHAT THIS IS FOR
@@ -175,12 +175,15 @@ Removes dead air from multitrack podcast recordings.
 Everything runs on your own machine. Nothing is uploaded, and there is no
 account or subscription.
 
-Free and open source under the MIT licence.
-{PROJECT_URL}
+Free to use and to pass on.
 
 Built on ffmpeg, numpy, sounddevice and pedalboard.
 Transcription, when enabled, uses WhisperX.
-Bundled effects: rnnoise and ZamPlugins, both open source.
+Bundled effects: rnnoise and ZamPlugins.
+
+This program includes GPL-licensed components, so it is distributed under
+the GNU General Public License version 3. You may obtain the complete
+corresponding source code by writing to {SOURCE_CONTACT}.
 
 See THIRD-PARTY-NOTICES.txt, installed alongside the program, for the
 licences of everything included.

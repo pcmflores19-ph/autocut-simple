@@ -1,5 +1,27 @@
-Auto-Cut bundles third-party software. Auto-Cut itself is MIT licensed (see
-LICENSE); the components below keep their own licences.
+Auto-Cut bundles third-party software. The components below keep their own
+licences.
+
+==========================================================================
+ WRITTEN OFFER FOR SOURCE CODE
+==========================================================================
+
+This program includes pedalboard, rnnoise and ZamPlugins, which are licensed
+under the GNU General Public License. The application as distributed is
+therefore covered by the GPL version 3.
+
+For a period of three years from the date you received this program, you may
+obtain the complete corresponding source code for it, and for the GPL
+components it contains, by writing to:
+
+    pcmflores19@gmail.com
+
+The source will be provided at no charge beyond the cost of delivery, on a
+medium customarily used for software interchange, or by download.
+
+This offer is valid for anyone who receives a copy of this program.
+
+The source for the third-party components is also available directly from
+their own projects, at the addresses given below.
 
 --------------------------------------------------------------------------
 FFmpeg  (ffmpeg.exe, ffprobe.exe)
@@ -41,10 +63,9 @@ sounddevice  MIT               https://python-sounddevice.readthedocs.io/
 PortAudio    MIT               https://www.portaudio.com/
 pedalboard   GPL v3            https://github.com/spotify/pedalboard
 
-pedalboard is licensed GPL v3. It is imported by Auto-Cut when you use the
-VST3 effects, which makes the distributed application as a whole subject to
-GPL v3 terms. Auto-Cut's own source remains available under the MIT licence
-at the project page, so anyone may take it and use it under either.
+pedalboard is licensed GPL v3 and is imported by Auto-Cut, which is what
+makes the distributed application as a whole subject to GPL v3. See the
+written offer at the top of this file for how to obtain the source.
 
 --------------------------------------------------------------------------
 Optional, not bundled
