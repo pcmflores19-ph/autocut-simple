@@ -2,17 +2,16 @@
 UI construction for the editor, kept apart from the editing logic in app.py.
 
 Laid out like DaVinci Resolve, because that is where the exported timeline
-ends up: page buttons along the bottom, a viewer and inspector on the Edit
-page, and the timeline filling the width beneath them.
+ends up: transcript and inspector above, the timeline filling the width
+beneath them. There is only one page - exporting is a menu, not somewhere you
+navigate to.
 """
 
-import os
 import tkinter as tk
 from tkinter import ttk
 
 import ui_theme
-from whisperx_runner import (DEFAULT_BATCH_SIZE, DEFAULT_COMPUTE_TYPE,
-                             DEFAULT_LANGUAGE, DEFAULT_MODEL, LANGUAGES)
+from whisperx_runner import DEFAULT_LANGUAGE, DEFAULT_MODEL, LANGUAGES
 
 LANE_HEIGHT = 74
 RULER_HEIGHT = 18
@@ -222,7 +221,7 @@ class UIBuilderMixin:
         self.language_box = language_box
         ttk.Label(inspector, style="PanelDim.TLabel",
                   text=f"cuts from the waveform, then transcribes with "
-                       f"{DEFAULT_MODEL}").pack(anchor="w", padx=8)
+                       f"WhisperX {DEFAULT_MODEL}").pack(anchor="w", padx=8)
 
         ttk.Separator(inspector).pack(fill="x", padx=8, pady=8)
 
