@@ -219,7 +219,10 @@ class UIBuilderMixin:
                           lambda e: self._on_language_change(language_box.get()))
         language_box.pack(side="left", padx=6)
         self.language_box = language_box
-        ttk.Label(inspector, style="PanelDim.TLabel",
+        # wraplength, like every other hint in this panel - without it the text
+        # is silently clipped at the edge of the inspector rather than wrapping.
+        ttk.Label(inspector, style="PanelDim.TLabel", justify="left",
+                  wraplength=INSPECTOR_WIDTH - 40,
                   text=f"cuts from the waveform, then transcribes with "
                        f"WhisperX {DEFAULT_MODEL}").pack(anchor="w", padx=8)
 
