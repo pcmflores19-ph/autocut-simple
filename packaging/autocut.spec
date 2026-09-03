@@ -38,6 +38,23 @@ def _ffmpeg_binaries():
     return found
 
 
+def _bundled_plugins():
+    """
+    The open-source voice chain from fetch_plugins.py, if it has been run.
+
+    Shipping rnnoise is not cosmetic: voice_activity uses it to denoise before
+    gating, so without it the auto-cut is measurably worse on a machine that
+    has no copy installed.
+    """
+    source = os.path.join(SPECPATH, "vst3")
+    if not os.path.isdir(source):
+        print("WARNING: packaging/vst3 is empty - run fetch_plugins.py to "
+              "bundle the plugins, or the FX window will be empty on a "
+              "clean machine.")
+        return []
+    return [(source, "vst3")]
+
+
 a = Analysis(
     [os.path.join(SRC, "app.py")],
     pathex=[SRC],                  # flat sibling imports: `import ui_theme`
@@ -46,7 +63,10 @@ a = Analysis(
         (os.path.join(SPECPATH, "THIRD-PARTY-NOTICES.txt"), "."),
         (os.path.join(SPECPATH, "FFMPEG-LICENSE.txt"), "."),
         (os.path.join(BASE, "LICENSE"), "."),
-    ],
+        # The window icon. The `icon=` on EXE below is the shell icon for the
+        # .exe file itself and does nothing for the tkinter window.
+        (os.path.join(SRC, "assets"), "assets"),
+    ] + _bundled_plugins(),
     # These are reached only through the frozen re-launch or lazily inside
     # functions, so PyInstaller's import scan does not see them.
     hiddenimports=[

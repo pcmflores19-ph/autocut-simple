@@ -12,14 +12,13 @@
 #define AppPublisher "Paul Flores"
 #define AppURL "https://github.com/pcmflores/autocut-simple"
 
-; Read the version straight out of auto_cut/version.py so it can never drift
-; from what the About box reports.
-#define VerFile FileOpen("..\auto_cut\version.py")
-#define VerLine ""
-#sub ReadVersion
-  #expr VerLine = FileRead(VerFile)
-#endsub
-#define AppVersion "1.0.0"
+; Version comes from packaging/build.py as /DAppVersion=..., which reads it
+; out of auto_cut/version.py. The fallback is only for running ISCC by hand.
+; (An earlier attempt to read version.py with the Inno preprocessor was left
+; half-written and never actually ran, so the version silently drifted.)
+#ifndef AppVersion
+  #define AppVersion "1.0.0"
+#endif
 
 [Setup]
 AppId={{8F3C2A64-5B7E-4D91-A0C3-7E5D9B1A2F48}
@@ -47,6 +46,8 @@ WizardStyle=modern
 ArchitecturesAllowed=x64compatible
 ArchitecturesInstallIn64BitMode=x64compatible
 UninstallDisplayIcon={app}\{#AppExeName}
+; The installer's own icon, and the one shown in Add/Remove Programs.
+SetupIconFile=autocut.ico
 
 [Languages]
 Name: "english"; MessagesFile: "compiler:Default.isl"

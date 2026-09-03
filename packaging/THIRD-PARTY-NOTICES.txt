@@ -16,6 +16,24 @@ from ffmpeg.org and from the build project linked above.
 This build contains no GPL-licensed components.
 
 --------------------------------------------------------------------------
+Bundled VST3 plugins  (installed under vst3/)
+--------------------------------------------------------------------------
+rnnoise / noise-suppression-for-voice
+  Licence : GNU General Public License version 3
+  Source  : https://github.com/werman/noise-suppression-for-voice
+
+ZamPlugins  (ZamGate, ZamComp, ZamEQ2, ZamDynamicEQ, ZaMaximX2, ZamNoise)
+  Licence : GNU General Public License version 2 or later
+  Source  : https://github.com/zamaudio/zam-plugins
+
+Both are unmodified binaries from the projects' own releases, loaded at
+runtime as plugins. The complete corresponding source is at the addresses
+above. Auto-Cut ships a subset of ZamPlugins, not the full set.
+
+No freeware plugins are included. Free of charge is not the same as free to
+redistribute, and the ones used while developing Auto-Cut do not permit it.
+
+--------------------------------------------------------------------------
 Python packages
 --------------------------------------------------------------------------
 NumPy        BSD 3-Clause      https://numpy.org/

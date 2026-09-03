@@ -66,7 +66,17 @@ def vst3_dir():
     without it.
     """
     path = os.path.join(_bundle_dir(), "vst3")
-    return path if os.path.isdir(path) else None
+    if os.path.isdir(path):
+        return path
+    # Running from source the plugins have not been copied in yet; they sit
+    # where fetch_plugins.py put them. Looking there too means development
+    # behaves like an installed copy instead of quietly differing from it.
+    if not frozen():
+        source_side = os.path.join(
+            os.path.dirname(_bundle_dir()), "packaging", "vst3")
+        if os.path.isdir(source_side):
+            return source_side
+    return None
 
 
 # --------------------------------------------------------- plugin editor

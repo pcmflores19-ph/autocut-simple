@@ -380,6 +380,8 @@ class AutoCutApp(UIBuilderMixin, ActionsMixin):
                 self.log("Detecting speech (normalize -> rnnoise -> gate). "
                          "Both are analysis only - your audio is not altered.")
             else:
+                # Only reachable when running from source without rnnoise
+                # installed; a built copy ships it.
                 self.log("Detecting speech. rnnoise was not found, so the gate "
                          "runs on the raw waveform; expect it to be less exact "
                          "on a noisy room.")

@@ -130,6 +130,12 @@ idea, since it pulls in torch — point at it directly:
 export AUTOCUT_WHISPERX=/path/to/venv/bin/whisperx   # Windows: set AUTOCUT_WHISPERX=...
 ```
 
+Pick the model from the **Model** dropdown next to Analyze. Bigger is more
+accurate and much slower: `tiny` and `base` are usable on any laptop, `small`
+is a good compromise on a processor, and the `large` models really want an
+NVIDIA card. The app warns you if you pick a large model without one, because
+that combination looks exactly like the app having frozen.
+
 All 100 Whisper languages are available. Whisper transcribes all of them, but
 WhisperX only ships word-level *alignment* models for about 40. Without
 alignment the word timings are coarse — which now only makes the karaoke
@@ -141,6 +147,27 @@ transcription of an hour-long track is slow, so pick a smaller model if that is
 your situation. Force the choice with `AUTOCUT_DEVICE=cpu` or `cuda`.
 
 ---
+
+## Included effects
+
+The Windows installer ships a small, open-source voice chain so the FX window
+is not empty on a fresh install:
+
+| Plugin | Use |
+|---|---|
+| rnnoise | noise suppression |
+| ZamGate | gate the idle microphone |
+| ZamComp | compressor |
+| ZamEQ2 | parametric EQ |
+| ZamDynamicEQ | dynamic EQ, doubles as a de-esser |
+| ZaMaximX2 | limiter |
+| ZamNoise | broadband noise reduction |
+
+Any VST3 you have installed yourself appears alongside them, and takes priority
+if it has the same name.
+
+rnnoise earns its place twice over: the speech detection uses it to denoise
+each track before gating, so the cuts themselves are better for it being there.
 
 ## Usage
 
@@ -316,6 +343,12 @@ file in a bug report helps a great deal.
 Bug reports and pull requests are welcome. For a bug, the most useful things to
 include are your operating system, what you were doing, and the contents of
 `auto_cut/autocut_crash.log` if the app closed unexpectedly.
+
+## Updates
+
+**Help > Check for updates** asks GitHub whether there is a newer release.
+Nothing is checked automatically and nothing is downloaded or installed for
+you - the app makes no network requests at all unless you ask it to.
 
 ## Licence
 

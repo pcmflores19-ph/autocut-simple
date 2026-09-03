@@ -48,7 +48,22 @@ def _default_search_dirs():
     ]
 
 
-VST3_SEARCH_DIRS = _default_search_dirs()
+def _search_dirs():
+    """
+    System VST3 folders, then any plugins shipped with the app.
+
+    Order matters. discover_plugins keeps the FIRST match for a given name, so
+    putting the bundle last means a user's own install of rnnoise (or anything
+    else we ship) wins over our copy - which is what they would expect.
+    """
+    dirs = _default_search_dirs()
+    shipped = bundled.vst3_dir()
+    if shipped:
+        dirs.append(shipped)
+    return dirs
+
+
+VST3_SEARCH_DIRS = _search_dirs()
 
 # Inside a bundle the binary sits under Contents/<arch>/. The names differ per
 # platform, and listing all of them costs nothing - a directory that is not

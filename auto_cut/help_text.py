@@ -38,6 +38,12 @@ hour-long recording. After that it is cached and re-runs are quick.
 If WhisperX is installed, transcription starts automatically once the cuts are
 ready. You do not have to wait for it - the edit is already usable.
 
+The Model dropdown decides how good and how slow that transcription is. Bigger
+is better and much slower: tiny and base suit any laptop, small is a fair
+compromise on a processor, and the large models really want an NVIDIA graphics
+card. Choosing a large model without one is the most common reason people think
+the app has frozen - it has not, it is just going to take hours.
+
 
 3. SET THE AGGRESSIVENESS
 
@@ -76,6 +82,13 @@ talking, which removes bleed, breathing and keyboard noise from the idle mic.
 
 Each track has its own VST3 chain, opened with its FX button. Plugin windows
 open separately and what you hear updates as you turn a knob.
+
+The installed version comes with a free voice chain already: rnnoise for noise
+suppression, ZamGate, ZamComp, ZamEQ2, ZamDynamicEQ, ZaMaximX2 and ZamNoise.
+Any VST3 plugin you install yourself shows up beside them.
+
+A sensible starting order for a voice is: rnnoise, then ZamGate, then ZamComp,
+then ZamEQ2, with ZaMaximX2 last to catch peaks.
 
 Effects are rendered into the WAV export. They are NOT written into the Resolve
 timeline, which points at your untouched original recordings - do that side of
@@ -132,8 +145,9 @@ No sound during playback
     device. Change it in your sound settings and restart Auto-Cut.
 
 The FX window is empty
-    Only VST3 plugins are found, and only in the standard folder for your
-    system. VST2 plugins are not supported.
+    The installed version ships its own plugins, so this should not happen -
+    try reinstalling. Running from source, only VST3 plugins are found, and
+    only in the standard folder for your system. VST2 is not supported.
 
 Transcription never happens
     It needs WhisperX, which is a separate install. Everything else works
@@ -166,4 +180,8 @@ Free and open source under the MIT licence.
 
 Built on ffmpeg, numpy, sounddevice and pedalboard.
 Transcription, when enabled, uses WhisperX.
+Bundled effects: rnnoise and ZamPlugins, both open source.
+
+See THIRD-PARTY-NOTICES.txt, installed alongside the program, for the
+licences of everything included.
 """
