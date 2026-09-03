@@ -11,9 +11,10 @@ therefore covered by the GPL version 3.
 
 For a period of three years from the date you received this program, you may
 obtain the complete corresponding source code for it, and for the GPL
-components it contains, by writing to:
+components it contains, by sending a message to:
 
-    pcmflores19@gmail.com
+    Behind The Science Podcast
+    https://www.facebook.com/btspodcastph
 
 The source will be provided at no charge beyond the cost of delivery, on a
 medium customarily used for software interchange, or by download.
