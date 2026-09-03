@@ -546,6 +546,51 @@ class AutoCutApp(UIBuilderMixin, ActionsMixin):
             self._invalidate_analysis()
             break
 
+    # ---------- updates ----------
+
+    def check_for_updates(self):
+        """
+        Help > Check for updates. Never runs on its own.
+
+        The request goes on a worker thread and reports back through
+        root.after: a network that hangs rather than refusing would otherwise
+        freeze the whole window until it timed out.
+        """
+        self.log("Checking for updates...")
+        threading.Thread(target=self._updates_worker, daemon=True).start()
+
+    def _updates_worker(self):
+        import updates
+        status, release = updates.check()
+        self.root.after(0, lambda: self._updates_done(status, release))
+
+    def _updates_done(self, status, release):
+        import updates
+        from version import __version__
+
+        if status == "available":
+            newer = release["version"]
+            self.log(f"Update available: {newer} (you have {__version__}).")
+            if messagebox.askyesno(
+                    "Update available",
+                    f"Version {newer} is out. You have {__version__}." +
+                    chr(10) * 2 + "Open the download page?"):
+                self._open_url(release["url"])
+        elif status == "current":
+            self.log(f"Up to date ({__version__}).")
+            messagebox.showinfo(
+                "Up to date",
+                f"You are running the latest version ({__version__}).")
+        else:
+            # Offline, rate-limited, or no release published yet. None of those
+            # is the user's problem to debug, so offer the page and move on.
+            self.log("Could not check for updates.")
+            if messagebox.askyesno(
+                    "Could not check",
+                    "Could not reach GitHub to check for updates." +
+                    chr(10) * 2 + "Open the releases page in your browser?"):
+                self._open_url(updates.RELEASES_URL)
+
     def _update_analyze_hint(self):
         """Keeps the line under Analyze honest about what will actually run."""
         self.analyze_hint.config(

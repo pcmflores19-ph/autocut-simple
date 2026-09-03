@@ -8,9 +8,10 @@ navigate to.
 """
 
 import tkinter as tk
-from tkinter import ttk
+from tkinter import messagebox, ttk
 
 import help_text
+import links
 import ui_theme
 import version
 from whisperx_runner import (DEFAULT_LANGUAGE, DEFAULT_MODEL, LANGUAGES,
@@ -63,6 +64,7 @@ class UIBuilderMixin:
         menubar.add_cascade(label="File", menu=file_menu)
         self._build_export_menu(menubar)
         self._build_help_menu(menubar)
+        self._build_support_menu(menubar)
 
         self.root.config(menu=menubar)
         self.root.bind("<Control-s>", lambda e: self.save_project())
@@ -100,6 +102,8 @@ class UIBuilderMixin:
                          command=lambda: self._show_help(
                              "Troubleshooting", help_text.TROUBLESHOOTING))
         menu.add_separator()
+        menu.add_command(label="Check for updates...",
+                         command=self.check_for_updates)
         menu.add_command(label="Project page (opens your browser)",
                          command=self._open_project_page)
         menu.add_separator()
@@ -138,9 +142,42 @@ class UIBuilderMixin:
         window.bind("<Escape>", lambda e: window.destroy())
         text.focus_set()
 
-    def _open_project_page(self):
+    def _open_url(self, url):
         import webbrowser
-        webbrowser.open(version.PROJECT_URL)
+        webbrowser.open(url)
+
+    def _open_project_page(self):
+        self._open_url(version.PROJECT_URL)
+
+    def _open_support_link(self, title, url):
+        """
+        Opens a Support link, or explains itself if it was never filled in.
+
+        Sending someone to example.com is worse than saying nothing, so an
+        unedited placeholder says what it is instead.
+        """
+        if links.is_placeholder(url):
+            messagebox.showinfo(
+                title,
+                f"This link has not been set up yet." + chr(10) * 2 +
+                f"Whoever built this copy needs to put the real {title} "
+                f"address into auto_cut/links.py.")
+            return
+        self._open_url(url)
+
+    def _build_support_menu(self, menubar):
+        """Where people can find, and support, the podcast behind the app."""
+        menu = tk.Menu(menubar, tearoff=0, background=ui_theme.PANEL,
+                       foreground=ui_theme.TEXT,
+                       activebackground=ui_theme.SELECT)
+        for label, url in links.SUPPORT_MENU:
+            if label is None:
+                menu.add_separator()
+                continue
+            menu.add_command(
+                label=label,
+                command=lambda t=label, u=url: self._open_support_link(t, u))
+        menubar.add_cascade(label=f"Support {links.PODCAST_NAME}", menu=menu)
 
     def _build_status_bar(self):
         bar = ttk.Frame(self.root, style="Panel.TFrame")
