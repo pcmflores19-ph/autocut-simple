@@ -1,0 +1,33 @@
+# Decoded audio, transcripts and autosaves - regenerated on demand, and large
+# (a single hour-long track is roughly 300 MB of raw PCM).
+auto_cut/.cache/
+
+# Native crash dumps from faulthandler; they contain local paths.
+autocut_crash.log
+
+__pycache__/
+*.py[cod]
+
+# Recordings and renders. None of this belongs in a source repository.
+*.wav
+*.mp3
+*.m4a
+*.flac
+*.mp4
+*.mov
+*.mkv
+
+# Saved projects and exported timelines.
+*.autocut
+*.fcpxml
+
+# Development scratch: hand-written FCPXML probes and sample media.
+_import_tests/
+
+.venv/
+venv/
+.DS_Store
+
+# The abandoned in-Resolve scripting version. Kept on disk for reference, but
+# it only runs on Resolve Studio and would mislead anyone cloning this.
+legacy_resolve_api/

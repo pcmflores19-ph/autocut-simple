@@ -1,0 +1,198 @@
+"""
+Saving and reopening a session.
+
+Everything the app holds that isn't re-derivable from the media goes in a JSON
+`.autocut` file: the recordings, every hand edit, mixer state, VST chains (with
+each plugin's own `raw_state`, so a chain reopens exactly as it was tuned),
+framing, scene overrides and the transcript.
+
+Deliberately NOT stored: waveform peaks, decoded PCM and WhisperX output. Those
+live in `.cache/`, are keyed by file content, and rebuild on demand - putting
+them here would make projects enormous for no gain.
+"""
+
+import base64
+import json
+import os
+import time
+
+FORMAT_VERSION = 2
+PROJECT_EXTENSION = ".autocut"
+
+
+def _chain_to_dict(chain):
+    """A VST chain as plugin paths plus each plugin's own serialized state."""
+    if chain is None:
+        return {"enabled": True, "slots": []}
+    slots = []
+    for slot in chain.slots:
+        try:
+            raw = base64.b64encode(slot.plugin.raw_state).decode("ascii")
+        except Exception:
+            raw = None      # plugin can't serialize; it'll load at defaults
+        slots.append({"name": slot.name, "path": slot.path,
+                      "bypassed": slot.bypassed, "raw_state": raw})
+    return {"enabled": bool(chain.enabled), "slots": slots}
+
+
+def _chain_from_dict(data, log=None):
+    """Rebuilds a chain, skipping plugins that no longer load."""
+    import vst_host
+
+    chain = vst_host.TrackChain()
+    chain.enabled = bool(data.get("enabled", True))
+    for entry in data.get("slots", []):
+        path, name = entry.get("path"), entry.get("name", "?")
+        if not path or not os.path.exists(path):
+            if log:
+                log(f"Plugin missing, skipped: {name}")
+            continue
+        try:
+            slot = chain.add(name, path)
+        except Exception as exc:
+            if log:
+                log(f"Plugin failed to load, skipped: {name} ({exc})")
+            continue
+        slot.bypassed = bool(entry.get("bypassed"))
+        raw = entry.get("raw_state")
+        if raw:
+            try:
+                slot.apply_state(base64.b64decode(raw))
+            except Exception as exc:
+                if log:
+                    log(f"{name}: saved settings could not be restored ({exc})")
+    return chain
+
+
+def build(app):
+    """Snapshots the app into a plain dict."""
+    return {
+        "format_version": FORMAT_VERSION,
+        "speaker_paths": list(app.speaker_paths),
+        "aggressiveness": int(app.aggressiveness.get()),
+        "language": app.language.get() if hasattr(app, "language") else None,
+        "auto_mute": bool(app.auto_mute_on.get()),
+        "edits": [list(e) for e in app.edits],
+        "mute_edits": [list(e) for e in app.mute_edits],
+        "tracks": [
+            {"gain": t.gain, "muted": bool(t.muted), "soloed": bool(t.soloed)}
+            for t in app.player.tracks
+        ],
+        "chains": [_chain_to_dict(c) for c in app.track_chains],
+        "intro_path": app.intro_path,
+        "outro_path": app.outro_path,
+        "export_stems": bool(app.export_stems.get()),
+        # Speech is measured from the waveform, and re-measuring it means
+        # decoding and denoising every track again - minutes of work for a
+        # result that cannot have changed. The transcript is stored for the
+        # same reason.
+        "speech": [[list(iv) for iv in speech]
+                   for speech in (getattr(app, "per_speaker_speech", None) or [])],
+        "transcript": getattr(app, "transcript", None),
+        "framing": getattr(app, "framing", None),
+        "auto_cut": bool(app.auto_cut_on.get()) if hasattr(app, "auto_cut_on") else True,
+        "words": [list(words) for words in (getattr(app, "per_speaker_words", None) or [])],
+    }
+
+
+def save(path, app):
+    if not path.lower().endswith(PROJECT_EXTENSION):
+        path += PROJECT_EXTENSION
+    data = build(app)
+    # Write via a temp file so an interrupted save can't destroy a good project.
+    tmp = path + ".tmp"
+    with open(tmp, "w", encoding="utf-8") as f:
+        json.dump(data, f, indent=2, ensure_ascii=False)
+    os.replace(tmp, path)
+    return path
+
+
+def load(path):
+    with open(path, "r", encoding="utf-8") as f:
+        data = json.load(f)
+    if not isinstance(data, dict) or "speaker_paths" not in data:
+        raise ValueError("That doesn't look like an auto_cut project file.")
+    return data
+
+
+def missing_media(data):
+    """Which referenced files are no longer where the project says they are."""
+    missing = [p for p in data.get("speaker_paths", []) if not os.path.exists(p)]
+    for key in ("intro_path", "outro_path"):
+        p = data.get(key)
+        if p and not os.path.exists(p):
+            missing.append(p)
+    return missing
+
+
+def relink(data, replacements):
+    """
+    Applies {old_path: new_path} across the project. Used when a project is
+    opened on a machine where the recordings have moved.
+    """
+    data["speaker_paths"] = [replacements.get(p, p) for p in data.get("speaker_paths", [])]
+    for key in ("intro_path", "outro_path"):
+        if data.get(key) in replacements:
+            data[key] = replacements[data[key]]
+    return data
+
+
+# ------------------------------------------------------------------ autosave
+
+AUTOSAVE_NAME = "recovery.autocut"
+AUTOSAVE_SECONDS = 60
+
+
+def autosave_path():
+    """Beside the cache, not beside the user's project - it's scratch state."""
+    directory = os.path.join(os.path.dirname(os.path.abspath(__file__)), ".cache")
+    os.makedirs(directory, exist_ok=True)
+    return os.path.join(directory, AUTOSAVE_NAME)
+
+
+def autosave(app):
+    """
+    Snapshots the session so a crash doesn't cost the work.
+
+    Written periodically rather than on exit: a native crash - a VST taking the
+    process down, for instance - runs no Python cleanup at all, so there is no
+    "on crash" hook to hang this off.
+    """
+    path = autosave_path()
+    data = build(app)
+    data["autosaved_at"] = time.time()
+    data["autosaved_project"] = getattr(app, "project_path", None)
+    tmp = path + ".tmp"
+    with open(tmp, "w", encoding="utf-8") as f:
+        json.dump(data, f, ensure_ascii=False)
+    os.replace(tmp, path)
+    return path
+
+
+def pending_recovery(max_age_days=7):
+    """
+    A usable autosave from a previous run, or None.
+
+    Ignores an empty one (nothing was loaded) and anything stale.
+    """
+    path = autosave_path()
+    if not os.path.exists(path):
+        return None
+    try:
+        with open(path, "r", encoding="utf-8") as f:
+            data = json.load(f)
+    except Exception:
+        return None
+    if not data.get("speaker_paths"):
+        return None
+    age = time.time() - float(data.get("autosaved_at", 0))
+    if age > max_age_days * 86400:
+        return None
+    return data
+
+
+def clear_autosave():
+    try:
+        os.remove(autosave_path())
+    except OSError:
+        pass

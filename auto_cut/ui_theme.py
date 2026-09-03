@@ -1,0 +1,146 @@
+"""
+DaVinci Resolve-ish dark theme for the tkinter UI.
+
+The exported timeline lands in Resolve, so the tool looks like where the work
+ends up rather than like a stock tkinter dialog. Colours are sampled from
+Resolve 21's edit page: near-black panels, mid-grey controls, a single warm
+accent used sparingly.
+"""
+
+from tkinter import ttk
+
+# Palette
+BG = "#1c1c1c"            # window background
+PANEL = "#252525"         # panel / section background
+PANEL_LIGHT = "#2e2e2e"   # raised controls
+BORDER = "#3a3a3a"
+TIMELINE_BG = "#141414"   # waveform / meter canvases
+TEXT = "#d8d8d8"
+TEXT_DIM = "#8c8c8c"
+ACCENT = "#e08a3c"        # Resolve's orange, for the active page and playhead
+ACCENT_DIM = "#8a5626"
+SELECT = "#2f5d8a"        # selection blue
+
+# Track lane colours, reused by the waveform, mixer swatches and meters.
+LANE_COLORS = ["#57b9a6", "#c9a227", "#7a9ec2", "#c07ab8", "#9ec27a"]
+
+FONT = ("Segoe UI", 9)
+FONT_SMALL = ("Segoe UI", 8)
+FONT_BOLD = ("Segoe UI", 9, "bold")
+FONT_TITLE = ("Segoe UI", 11, "bold")
+
+
+def apply(root):
+    """Applies the theme to a Tk root. Returns the ttk.Style for further tweaks."""
+    root.configure(background=BG)
+
+    style = ttk.Style(root)
+    # 'clam' is the only built-in theme that honours background colours on
+    # Windows; 'vista' ignores most of what we set here.
+    try:
+        style.theme_use("clam")
+    except Exception:
+        pass
+
+    style.configure(".", background=BG, foreground=TEXT, font=FONT,
+                    fieldbackground=PANEL_LIGHT, bordercolor=BORDER,
+                    lightcolor=PANEL_LIGHT, darkcolor=PANEL)
+
+    style.configure("TFrame", background=BG)
+    style.configure("Panel.TFrame", background=PANEL)
+    style.configure("TLabel", background=BG, foreground=TEXT)
+    style.configure("Panel.TLabel", background=PANEL, foreground=TEXT)
+    style.configure("Dim.TLabel", background=BG, foreground=TEXT_DIM)
+    style.configure("PanelDim.TLabel", background=PANEL, foreground=TEXT_DIM)
+    style.configure("Title.TLabel", background=BG, foreground=TEXT, font=FONT_TITLE)
+    style.configure("Value.TLabel", background=BG, foreground=ACCENT, font=FONT_BOLD)
+
+    style.configure("TLabelframe", background=BG, bordercolor=BORDER,
+                    relief="solid", borderwidth=1)
+    style.configure("TLabelframe.Label", background=BG, foreground=TEXT_DIM,
+                    font=FONT_SMALL)
+
+    style.configure("TButton", background=PANEL_LIGHT, foreground=TEXT,
+                    bordercolor=BORDER, focuscolor=BG, padding=(8, 4))
+    style.map("TButton",
+              background=[("pressed", ACCENT_DIM), ("active", "#3a3a3a"),
+                          ("disabled", PANEL)],
+              foreground=[("disabled", "#5a5a5a")])
+
+    style.configure("Accent.TButton", background=ACCENT_DIM, foreground="#f0f0f0")
+    style.map("Accent.TButton", background=[("active", ACCENT), ("disabled", PANEL)])
+
+    style.configure("TCheckbutton", background=BG, foreground=TEXT,
+                    focuscolor=BG, indicatorcolor=PANEL_LIGHT)
+    style.map("TCheckbutton",
+              background=[("active", BG)],
+              indicatorcolor=[("selected", ACCENT), ("pressed", ACCENT_DIM)])
+    style.configure("Panel.TCheckbutton", background=PANEL, foreground=TEXT)
+    style.map("Panel.TCheckbutton", background=[("active", PANEL)])
+
+    style.configure("TRadiobutton", background=BG, foreground=TEXT, focuscolor=BG)
+    style.map("TRadiobutton", background=[("active", BG)],
+              indicatorcolor=[("selected", ACCENT)])
+
+    style.configure("TScale", background=BG, troughcolor=PANEL_LIGHT,
+                    bordercolor=BORDER)
+    style.configure("Horizontal.TScale", background=BG, troughcolor=PANEL_LIGHT)
+
+    style.configure("TScrollbar", background=PANEL_LIGHT, troughcolor=PANEL,
+                    bordercolor=BORDER, arrowcolor=TEXT_DIM)
+    style.map("TScrollbar", background=[("active", "#4a4a4a")])
+
+    style.configure("TCombobox", fieldbackground=PANEL_LIGHT, background=PANEL_LIGHT,
+                    foreground=TEXT, arrowcolor=TEXT, bordercolor=BORDER)
+    style.map("TCombobox", fieldbackground=[("readonly", PANEL_LIGHT)],
+              selectbackground=[("readonly", SELECT)])
+
+    # Timeline scrollbar: wider than default so the thumb stays grabbable when
+    # zoomed deep into an hour-long episode.
+    style.configure("Fat.Horizontal.TScrollbar", background=PANEL_LIGHT,
+                    troughcolor=PANEL, bordercolor=BORDER, arrowcolor=TEXT,
+                    arrowsize=18, width=18)
+    style.map("Fat.Horizontal.TScrollbar", background=[("active", ACCENT_DIM)])
+
+    style.configure("TProgressbar", background=ACCENT, troughcolor=PANEL_LIGHT,
+                    bordercolor=BORDER)
+
+    style.configure("TNotebook", background=BG, bordercolor=BORDER)
+    style.configure("TNotebook.Tab", background=PANEL, foreground=TEXT_DIM,
+                    padding=(14, 6))
+    style.map("TNotebook.Tab", background=[("selected", BG)],
+              foreground=[("selected", ACCENT)])
+
+    style.configure("Treeview", background=PANEL, fieldbackground=PANEL,
+                    foreground=TEXT, bordercolor=BORDER, rowheight=22)
+    style.map("Treeview", background=[("selected", SELECT)])
+    style.configure("Treeview.Heading", background=PANEL_LIGHT, foreground=TEXT_DIM,
+                    font=FONT_SMALL)
+
+    return style
+
+
+def listbox_options():
+    """kwargs for tk.Listbox, which is a classic widget and ignores ttk styling."""
+    return {
+        "background": PANEL,
+        "foreground": TEXT,
+        "selectbackground": SELECT,
+        "selectforeground": "#ffffff",
+        "highlightthickness": 0,
+        "borderwidth": 0,
+        "font": FONT,
+    }
+
+
+def text_options():
+    """kwargs for tk.Text / tk.Entry."""
+    return {
+        "background": PANEL,
+        "foreground": TEXT,
+        "insertbackground": ACCENT,
+        "selectbackground": SELECT,
+        "highlightthickness": 0,
+        "borderwidth": 0,
+        "font": FONT,
+    }

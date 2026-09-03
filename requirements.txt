@@ -1,0 +1,12 @@
+# Auto-Cut runtime dependencies.
+#
+# Deliberately short. Everything else it needs is either in the Python standard
+# library (tkinter, urllib, wave, fractions) or an external program looked up on
+# PATH (ffmpeg, and optionally whisperx).
+
+numpy>=1.24
+sounddevice>=0.4.6
+
+# VST3 effects. Optional in the sense that the app starts and cuts without it -
+# only the FX buttons stop working.
+pedalboard>=0.9
