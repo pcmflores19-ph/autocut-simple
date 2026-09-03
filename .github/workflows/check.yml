@@ -1,0 +1,34 @@
+# A deliberately small check: does the code import and compile on all three
+# platforms? For a desktop app with no test suite, that catches the mistakes
+# that actually happen - a stray Windows-only import, or a module deleted while
+# something still references it.
+name: check
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  compile:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Byte-compile every module
+        run: python -m compileall -q auto_cut
+
+      - name: Import the modules that must not need a display
+        shell: bash
+        run: |
+          cd auto_cut
+          python -c "import voice_activity, silence_detector, fcpxml_writer, media_probe, whisperx_runner, project"
+          echo "core modules import cleanly"

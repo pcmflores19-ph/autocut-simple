@@ -1,0 +1,17 @@
+# Normalise line endings so the repo is identical for everyone, whatever
+# platform they clone on.
+* text=auto
+
+# The shell launcher MUST keep Unix line endings. With CRLF, macOS and Linux
+# fail with a baffling "bad interpreter: /usr/bin/env bash^M".
+*.sh text eol=lf
+
+# Batch files are the opposite case: Windows wants CRLF.
+*.bat text eol=crlf
+
+# Never touch binary content.
+*.png binary
+*.jpg binary
+*.gif binary
+*.wav binary
+*.mp4 binary
