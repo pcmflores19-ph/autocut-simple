@@ -51,6 +51,24 @@ def have_tool(name):
     return os.path.isabs(path) or shutil.which(path) is not None
 
 
+def asset(name):
+    """Full path to a file in auto_cut/assets, wherever we are running from."""
+    return os.path.join(_bundle_dir(), "assets", name)
+
+
+def vst3_dir():
+    """
+    The VST3 plugins shipped with the app, or None if there are none.
+
+    A build bundles a small open-source voice chain so the FX window is not
+    empty on a fresh install, and - more importantly - so rnnoise is present
+    for the speech detection in voice_activity, which is measurably worse
+    without it.
+    """
+    path = os.path.join(_bundle_dir(), "vst3")
+    return path if os.path.isdir(path) else None
+
+
 # --------------------------------------------------------- plugin editor
 
 # A frozen app has no interpreter to run plugin_editor.py with - sys.executable

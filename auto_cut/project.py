@@ -71,6 +71,8 @@ def build(app):
         "speaker_paths": list(app.speaker_paths),
         "aggressiveness": int(app.aggressiveness.get()),
         "language": app.language.get() if hasattr(app, "language") else None,
+        "whisper_model": (app.whisper_model.get()
+                          if hasattr(app, "whisper_model") else None),
         "auto_mute": bool(app.auto_mute_on.get()),
         "edits": [list(e) for e in app.edits],
         "mute_edits": [list(e) for e in app.mute_edits],

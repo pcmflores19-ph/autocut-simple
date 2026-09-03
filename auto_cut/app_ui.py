@@ -13,7 +13,8 @@ from tkinter import ttk
 import help_text
 import ui_theme
 import version
-from whisperx_runner import DEFAULT_LANGUAGE, DEFAULT_MODEL, LANGUAGES
+from whisperx_runner import (DEFAULT_LANGUAGE, DEFAULT_MODEL, LANGUAGES,
+                             MODELS, language_label, model_label)
 
 LANE_HEIGHT = 74
 RULER_HEIGHT = 18
@@ -67,6 +68,18 @@ class UIBuilderMixin:
         self.root.bind("<Control-s>", lambda e: self.save_project())
         self.root.bind("<Control-o>", lambda e: self.open_project())
         self.root.bind("<Control-n>", lambda e: self.new_project())
+
+    def _labelled_combo(self, parent, label, values, initial, on_change):
+        """A caption and a read-only dropdown on their own row."""
+        row = ttk.Frame(parent, style="Panel.TFrame")
+        row.pack(fill="x", padx=8, pady=(4, 0))
+        ttk.Label(row, text=label, width=9,
+                  style="PanelDim.TLabel").pack(side="left")
+        box = ttk.Combobox(row, state="readonly", height=24, values=values)
+        box.set(initial)
+        box.bind("<<ComboboxSelected>>", lambda e: on_change(box.get()))
+        box.pack(side="left", fill="x", expand=True)
+        return box
 
     def _build_help_menu(self, menubar):
         """
@@ -271,24 +284,31 @@ class UIBuilderMixin:
                                          style="Accent.TButton",
                                          command=self.start_analysis)
         self.analyze_button.pack(side="left")
-        # Language is chosen here, before Analyze, because analysis runs the
+
+        # Language and model get a row each rather than sharing the button's.
+        # The inspector is 340px and these dropdowns are wide; crowding three
+        # widgets onto one line is how the last label ended up clipped.
+        # Both are chosen BEFORE Analyze, because analysis runs the
         # transcription straight after finding the cuts.
         self.language = tk.StringVar(value=DEFAULT_LANGUAGE)
-        # 100 languages: give the dropdown room rather than a 5-line peephole.
-        language_box = ttk.Combobox(analyze, width=14, state="readonly",
-                                    height=24,
-                                    values=[label for label, _ in LANGUAGES])
-        language_box.set(next(l for l, v in LANGUAGES if v == DEFAULT_LANGUAGE))
-        language_box.bind("<<ComboboxSelected>>",
-                          lambda e: self._on_language_change(language_box.get()))
-        language_box.pack(side="left", padx=6)
-        self.language_box = language_box
+        self.language_box = self._labelled_combo(
+            inspector, "Language", [label for label, _ in LANGUAGES],
+            language_label(DEFAULT_LANGUAGE),
+            lambda value: self._on_language_change(value))
+
+        self.whisper_model = tk.StringVar(value=DEFAULT_MODEL)
+        self.model_box = self._labelled_combo(
+            inspector, "Model", [label for label, _ in MODELS],
+            model_label(DEFAULT_MODEL),
+            lambda value: self._on_model_change(value))
+
         # wraplength, like every other hint in this panel - without it the text
         # is silently clipped at the edge of the inspector rather than wrapping.
-        ttk.Label(inspector, style="PanelDim.TLabel", justify="left",
-                  wraplength=INSPECTOR_WIDTH - 40,
-                  text=f"cuts from the waveform, then transcribes with "
-                       f"WhisperX {DEFAULT_MODEL}").pack(anchor="w", padx=8)
+        self.analyze_hint = ttk.Label(inspector, style="PanelDim.TLabel",
+                                      justify="left",
+                                      wraplength=INSPECTOR_WIDTH - 40)
+        self.analyze_hint.pack(anchor="w", padx=8, pady=(2, 0))
+        self._update_analyze_hint()
 
         ttk.Separator(inspector).pack(fill="x", padx=8, pady=8)
 

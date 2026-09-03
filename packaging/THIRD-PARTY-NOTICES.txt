@@ -1,0 +1,35 @@
+Auto-Cut bundles third-party software. Auto-Cut itself is MIT licensed (see
+LICENSE); the components below keep their own licences.
+
+--------------------------------------------------------------------------
+FFmpeg  (ffmpeg.exe, ffprobe.exe)
+--------------------------------------------------------------------------
+Licence : GNU Lesser General Public License version 3 (LGPL v3)
+Source  : https://ffmpeg.org/
+Build   : https://github.com/BtbN/FFmpeg-Builds  (win64-lgpl)
+Full licence text: FFMPEG-LICENSE.txt, installed alongside this file.
+
+Auto-Cut runs these as separate programs; it does not link against FFmpeg.
+The binaries are unmodified. The complete corresponding source is available
+from ffmpeg.org and from the build project linked above.
+
+This build contains no GPL-licensed components.
+
+--------------------------------------------------------------------------
+Python packages
+--------------------------------------------------------------------------
+NumPy        BSD 3-Clause      https://numpy.org/
+sounddevice  MIT               https://python-sounddevice.readthedocs.io/
+PortAudio    MIT               https://www.portaudio.com/
+pedalboard   GPL v3            https://github.com/spotify/pedalboard
+
+pedalboard is licensed GPL v3. It is imported by Auto-Cut when you use the
+VST3 effects, which makes the distributed application as a whole subject to
+GPL v3 terms. Auto-Cut's own source remains available under the MIT licence
+at the project page, so anyone may take it and use it under either.
+
+--------------------------------------------------------------------------
+Optional, not bundled
+--------------------------------------------------------------------------
+WhisperX (BSD-4-Clause) is used for transcription when you install it
+separately. It is not included in this distribution.

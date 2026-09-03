@@ -11,7 +11,7 @@ import tkinter as tk
 from tkinter import filedialog, messagebox
 
 import project as project_io
-from whisperx_runner import LANGUAGES, language_label
+from whisperx_runner import LANGUAGES, language_label, model_label
 
 
 class ActionsMixin:
@@ -139,6 +139,12 @@ class ActionsMixin:
         if language:
             self.language.set(language)
             self.language_box.set(language_label(language))
+
+        model = data.get("whisper_model")
+        if model:
+            self.whisper_model.set(model)
+            self.model_box.set(model_label(model))
+        self._update_analyze_hint()
 
         self._pending_project = data      # chains/tracks restored after analysis
         for attr in ("intro", "outro"):

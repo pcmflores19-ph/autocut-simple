@@ -31,3 +31,13 @@ venv/
 # The abandoned in-Resolve scripting version. Kept on disk for reference, but
 # it only runs on Resolve Studio and would mislead anyone cloning this.
 legacy_resolve_api/
+
+# Build output from PyInstaller and Inno Setup.
+build/
+dist/
+packaging/output/
+*.spec.bak
+
+# Plugin binaries fetched at build time, and the source logo.
+packaging/vst3/
+packaging/logo-source.png

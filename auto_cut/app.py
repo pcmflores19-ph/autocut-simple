@@ -67,6 +67,7 @@ class AutoCutApp(UIBuilderMixin, ActionsMixin):
     def __init__(self, root):
         self.root = root
         root.title("Auto-Cut - Podcast Dead Air Remover")
+        self._set_window_icon(root)
         root.geometry("1280x860")
         root.minsize(1024, 700)
 
@@ -324,6 +325,25 @@ class AutoCutApp(UIBuilderMixin, ActionsMixin):
         self.summary_label.config(text="Analyze first to preview cuts.")
         self._draw_waveform()
 
+    def _set_window_icon(self, root):
+        """
+        The window, taskbar and alt-tab icon.
+
+        iconphoto rather than iconbitmap: Tk 8.6 reads PNG natively and this
+        works on all three platforms, where iconbitmap is Windows-only. The
+        PhotoImage is kept on self because iconphoto does NOT hold a reference
+        - let it be garbage collected and the icon silently disappears.
+
+        `True` makes it the default for new windows, so the help and FX dialogs
+        inherit it without doing anything.
+        """
+        try:
+            import bundled
+            self._icon_image = tk.PhotoImage(file=bundled.asset("autocut.png"))
+            root.iconphoto(True, self._icon_image)
+        except Exception:
+            pass          # a missing icon is not worth failing to start over
+
     # ---------- analysis ----------
 
     def start_analysis(self):
@@ -431,10 +451,12 @@ class AutoCutApp(UIBuilderMixin, ActionsMixin):
                 pass
 
             language = self.language.get()
+            model = self.whisper_model.get()
             words_per_speaker = []
             all_segments = []
             for index, path in enumerate(self.speaker_paths):
-                data = transcribe(path, language=language, progress=self.log)
+                data = transcribe(path, model=model, language=language,
+                                  progress=self.log)
                 words = data["words"]
                 self.log(f"  {len(words)} words, {len(data['segments'])} segments")
                 words_per_speaker.append(words)
@@ -501,8 +523,34 @@ class AutoCutApp(UIBuilderMixin, ActionsMixin):
                     self.language.set(value)
                     self.log(f"Language set to {text} - re-run Analyze to "
                              "transcribe in that language.")
+                    self._update_analyze_hint()
                     self._invalidate_analysis()
                 break
+
+    def _on_model_change(self, label):
+        from whisperx_runner import MODELS, device
+        for text, value in MODELS:
+            if text != label:
+                continue
+            if value == self.whisper_model.get():
+                break
+            self.whisper_model.set(value)
+            self.log(f"Whisper model set to {value} - re-run Analyze to "
+                     "transcribe with it.")
+            # Warn about the one combination that reliably looks like a hang.
+            if value.startswith("large") and device() == "cpu":
+                self.log("  no NVIDIA GPU here, and a large model on the CPU "
+                         "can take hours for an hour-long recording. 'small' "
+                         "or 'base' is the better choice.")
+            self._update_analyze_hint()
+            self._invalidate_analysis()
+            break
+
+    def _update_analyze_hint(self):
+        """Keeps the line under Analyze honest about what will actually run."""
+        self.analyze_hint.config(
+            text=f"cuts from the waveform, then transcribes with "
+                 f"WhisperX {self.whisper_model.get()}")
 
     def _after_project_open(self):
         """
