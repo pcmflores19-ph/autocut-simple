@@ -1,20 +1,17 @@
 """
 Where the Support menu points.
 
-===========================================================================
- THESE ARE PLACEHOLDERS. Replace them with the real URLs before publishing.
- Anything still containing "example.com" is treated as unset: the menu item
- says so rather than opening a dead link.
-===========================================================================
-
 Kept in their own file so changing a link never means touching UI code.
+`is_placeholder` still guards every entry, so an unfilled one explains itself
+instead of opening a dead page.
 """
 
-BUY_ME_A_COFFEE = "https://example.com/REPLACE-buymeacoffee"
-YOUTUBE = "https://example.com/REPLACE-youtube"
-SPOTIFY = "https://example.com/REPLACE-spotify"
-FACEBOOK = "https://example.com/REPLACE-facebook"
-INSTAGRAM = "https://example.com/REPLACE-instagram"
+BUY_ME_A_COFFEE = "https://buymeacoffee.com/podcastmesm"
+YOUTUBE = "https://www.youtube.com/@marineearthscience"
+# The share link carries a tracking parameter; the bare show URL is cleaner
+# and works the same.
+SPOTIFY = "https://open.spotify.com/show/4NTLrSfceKjpFvZWflzBJj"
+FACEBOOK = "https://www.facebook.com/btspodcastph"
 
 PODCAST_NAME = "Behind The Science Podcast"
 
@@ -26,7 +23,6 @@ SUPPORT_MENU = [
     ("Watch on YouTube", YOUTUBE),
     ("Listen on Spotify", SPOTIFY),
     ("Facebook", FACEBOOK),
-    ("Instagram", INSTAGRAM),
 ]
 
 
