@@ -14,7 +14,9 @@ import tempfile
 
 import numpy as np
 
-FFMPEG = "ffmpeg"
+import bundled
+
+FFMPEG = bundled.tool("ffmpeg")
 PEAK_SAMPLE_RATE = 8000  # plenty for drawing; keeps decode fast
 
 # Peaks are extracted once at this resolution and re-bucketed in the UI when

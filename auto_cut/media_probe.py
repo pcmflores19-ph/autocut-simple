@@ -7,7 +7,9 @@ import json
 import subprocess
 from fractions import Fraction
 
-FFPROBE = "ffprobe"
+import bundled
+
+FFPROBE = bundled.tool("ffprobe")
 
 
 class MediaInfo:

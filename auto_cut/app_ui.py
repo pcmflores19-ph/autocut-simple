@@ -10,7 +10,9 @@ navigate to.
 import tkinter as tk
 from tkinter import ttk
 
+import help_text
 import ui_theme
+import version
 from whisperx_runner import DEFAULT_LANGUAGE, DEFAULT_MODEL, LANGUAGES
 
 LANE_HEIGHT = 74
@@ -59,11 +61,73 @@ class UIBuilderMixin:
         file_menu.add_command(label="Quit", command=self._on_close)
         menubar.add_cascade(label="File", menu=file_menu)
         self._build_export_menu(menubar)
+        self._build_help_menu(menubar)
 
         self.root.config(menu=menubar)
         self.root.bind("<Control-s>", lambda e: self.save_project())
         self.root.bind("<Control-o>", lambda e: self.open_project())
         self.root.bind("<Control-n>", lambda e: self.new_project())
+
+    def _build_help_menu(self, menubar):
+        """
+        Help matters more than usual here: an installed copy has no README
+        beside it, so for anyone who did not clone the repository this menu is
+        the only documentation there is.
+        """
+        menu = tk.Menu(menubar, tearoff=0, background=ui_theme.PANEL,
+                       foreground=ui_theme.TEXT,
+                       activebackground=ui_theme.SELECT)
+        menu.add_command(label="Quick start",
+                         command=lambda: self._show_help(
+                             "Quick start", help_text.QUICK_START))
+        menu.add_command(label="Keyboard shortcuts", accelerator="F1",
+                         command=lambda: self._show_help(
+                             "Keyboard shortcuts", help_text.SHORTCUTS))
+        menu.add_command(label="Troubleshooting",
+                         command=lambda: self._show_help(
+                             "Troubleshooting", help_text.TROUBLESHOOTING))
+        menu.add_separator()
+        menu.add_command(label="Project page (opens your browser)",
+                         command=self._open_project_page)
+        menu.add_separator()
+        menu.add_command(label=f"About {version.APP_NAME}",
+                         command=lambda: self._show_help(
+                             f"About {version.APP_NAME}", help_text.ABOUT))
+        menubar.add_cascade(label="Help", menu=menu)
+
+        self.root.bind("<F1>", lambda e: self._show_help(
+            "Keyboard shortcuts", help_text.SHORTCUTS))
+
+    def _show_help(self, title, body):
+        """A read-only, scrollable, resizable text window."""
+        window = tk.Toplevel(self.root)
+        window.title(f"{version.APP_NAME} - {title}")
+        window.configure(background=ui_theme.BG)
+        window.geometry("760x620")
+        window.transient(self.root)
+
+        frame = ttk.Frame(window, style="Panel.TFrame")
+        frame.pack(fill="both", expand=True, padx=10, pady=10)
+        scroll = ttk.Scrollbar(frame, orient="vertical")
+        scroll.pack(side="right", fill="y")
+        text = tk.Text(frame, wrap="word", yscrollcommand=scroll.set,
+                       padx=12, pady=10, **ui_theme.text_options())
+        text.pack(side="left", fill="both", expand=True)
+        scroll.config(command=text.yview)
+
+        text.insert("1.0", body)
+        # Read-only, but still selectable and copyable - disabling the widget
+        # outright would stop people copying an error message out of it.
+        text.configure(state="disabled")
+
+        ttk.Button(window, text="Close", width=12,
+                   command=window.destroy).pack(pady=(0, 10))
+        window.bind("<Escape>", lambda e: window.destroy())
+        text.focus_set()
+
+    def _open_project_page(self):
+        import webbrowser
+        webbrowser.open(version.PROJECT_URL)
 
     def _build_status_bar(self):
         bar = ttk.Frame(self.root, style="Panel.TFrame")

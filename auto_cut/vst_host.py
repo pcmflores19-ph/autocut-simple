@@ -19,6 +19,8 @@ import sys
 import tempfile
 import threading
 
+import bundled
+
 def _default_search_dirs():
     """
     The standard VST3 locations for this operating system.
@@ -205,9 +207,6 @@ def open_editor_subprocess(slot, on_done=None, on_error=None):
     is hosted out-of-process instead. Returns immediately; callbacks fire on a
     worker thread.
     """
-    editor_script = os.path.join(os.path.dirname(os.path.abspath(__file__)),
-                                 "plugin_editor.py")
-
     # Already open? Bring that window forward instead of spawning another.
     existing = getattr(slot, "editor_process", None)
     if existing is not None and existing.poll() is None:
@@ -230,9 +229,7 @@ def open_editor_subprocess(slot, on_done=None, on_error=None):
                 with os.fdopen(fd, "wb") as f:
                     f.write(current)
 
-            cmd = [sys.executable, editor_script, slot.path]
-            if state_file:
-                cmd.append(state_file)
+            cmd = bundled.editor_command(slot.path, state_file)
 
             proc = subprocess.Popen(cmd, stdout=subprocess.PIPE,
                                     stderr=subprocess.PIPE, text=True, bufsize=1)

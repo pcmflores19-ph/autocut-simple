@@ -18,6 +18,8 @@ import threading
 import numpy as np
 import sounddevice as sd
 
+import bundled
+
 SAMPLE_RATE = 44100
 CACHE_DIR = os.path.join(os.path.dirname(__file__), ".cache")
 
@@ -39,7 +41,7 @@ def decode_to_pcm(audio_path):
 
     tmp_path = out_path + ".part"
     cmd = [
-        "ffmpeg", "-v", "error", "-y", "-i", audio_path,
+        bundled.tool("ffmpeg"), "-v", "error", "-y", "-i", audio_path,
         "-map", "0:a:0", "-ac", "1", "-ar", str(SAMPLE_RATE),
         "-f", "s16le", tmp_path,
     ]

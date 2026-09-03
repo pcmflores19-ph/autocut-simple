@@ -21,8 +21,10 @@ import numpy as np
 
 from player import SAMPLE_RATE, decode_to_pcm
 
-FFMPEG = "ffmpeg"
-FFPROBE = "ffprobe"
+import bundled
+
+FFMPEG = bundled.tool("ffmpeg")
+FFPROBE = bundled.tool("ffprobe")
 
 
 def decode_audio_file(path):

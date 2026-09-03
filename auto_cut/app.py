@@ -1556,8 +1556,8 @@ def _check_ffmpeg():
     failure used to surface as a bare FileNotFoundError deep inside a worker
     thread - useless to someone who has just downloaded this.
     """
-    import shutil
-    missing = [tool for tool in ("ffmpeg", "ffprobe") if not shutil.which(tool)]
+    import bundled
+    missing = [t for t in ("ffmpeg", "ffprobe") if not bundled.have_tool(t)]
     if not missing:
         return True
     messagebox.showerror(
@@ -1573,6 +1573,15 @@ def _check_ffmpeg():
 
 
 def main():
+    # A frozen build has no interpreter to run plugin_editor.py with, so the
+    # executable re-launches itself behind this flag to host a plugin window.
+    # Must be the very first thing main() does - everything below builds a UI.
+    import bundled
+    if len(sys.argv) > 1 and sys.argv[1] == bundled.EDITOR_FLAG:
+        import plugin_editor
+        sys.argv = [sys.argv[0]] + sys.argv[2:]
+        return plugin_editor.main()
+
     log_handle = _start_crash_log()
 
     root = tk.Tk()
@@ -1594,4 +1603,4 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    sys.exit(main() or 0)
