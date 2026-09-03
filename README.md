@@ -27,36 +27,92 @@ to import. That works on **every** edition, free included.
 
 ---
 
-## Requirements
+## What you need
 
-- **Python 3.10+** with tkinter (bundled on Windows and macOS; on Debian or
-  Ubuntu, `sudo apt install python3-tk`)
-- **ffmpeg and ffprobe** on your PATH — these do all the audio decoding:
-  - Windows: `winget install Gyan.FFmpeg`
-  - macOS: `brew install ffmpeg`
-  - Linux: `sudo apt install ffmpeg`
-- **VST3 plugins** (optional) for the per-track effects
-- **WhisperX** (optional) for transcripts
+| | Required? | Why |
+|---|---|---|
+| Python 3.10 or newer | yes | the app is written in it |
+| ffmpeg + ffprobe | yes | reads and writes all the audio |
+| VST3 plugins | optional | only for the per-track effects |
+| WhisperX | optional | only for transcripts — cutting works without it |
+| NVIDIA GPU | optional | makes transcription much faster |
 
-The app checks for ffmpeg at startup and says so plainly if it is missing,
-rather than failing later with a stack trace.
+Runs on Windows, macOS and Linux.
 
-## Install
+## Installation
+
+If you have never used Python or the command line before, follow this from the
+top — it takes about ten minutes, most of it waiting for downloads.
+
+### 1. Install Python
+
+Download it from [python.org/downloads](https://www.python.org/downloads/).
+
+> **On Windows, tick "Add python.exe to PATH" on the first screen of the
+> installer.** It is off by default, and without it every command below fails
+> with "python is not recognized". If you have already installed Python and hit
+> that error, run the installer again, choose Modify, and enable it.
+
+On Debian or Ubuntu you also need tkinter, which is packaged separately:
+
+```bash
+sudo apt install python3 python3-pip python3-tk
+```
+
+Check it worked — open a new terminal (PowerShell on Windows) and run:
+
+```bash
+python --version
+```
+
+You should see `Python 3.10` or higher. On macOS and Linux you may need
+`python3` instead of `python` in every command here.
+
+### 2. Install ffmpeg
+
+This does all the audio decoding. Auto-Cut cannot run without it.
+
+```bash
+winget install Gyan.FFmpeg     # Windows
+brew install ffmpeg            # macOS  (needs https://brew.sh)
+sudo apt install ffmpeg        # Debian / Ubuntu
+```
+
+**Close your terminal and open a new one afterwards**, so it picks up the
+change, then check:
+
+```bash
+ffmpeg -version
+```
+
+### 3. Download Auto-Cut
+
+Either clone it, if you have git:
 
 ```bash
 git clone https://github.com/<you>/autocut-simple.git
 cd autocut-simple
+```
+
+or, without git: click the green **Code** button at the top of this page,
+choose **Download ZIP**, unzip it somewhere sensible, and `cd` into the folder.
+
+### 4. Install the Python dependencies
+
+```bash
 pip install -r requirements.txt
 ```
 
-Then run it:
+Three packages, no compiler needed.
+
+### 5. Run it
 
 ```bash
 python auto_cut/app.py
 ```
 
-or double-click `launch_autocut.bat` (Windows) / run `./launch_autocut.sh`
-(macOS, Linux).
+Or just double-click **`launch_autocut.bat`** on Windows. On macOS and Linux,
+`./launch_autocut.sh` (you may need `chmod +x launch_autocut.sh` once).
 
 ### Transcripts (optional)
 
@@ -207,6 +263,44 @@ added clips that Resolve then redistributed on import.
 
 ---
 
+## Troubleshooting
+
+**"python is not recognized" / "command not found"**
+Python is not on your PATH. On Windows, re-run the Python installer, choose
+Modify, and tick "Add python.exe to PATH". On macOS and Linux, try `python3`.
+
+**"ffmpeg is required" when the app starts**
+ffmpeg is not installed, or your terminal was open before you installed it.
+Close every terminal window, open a new one, and check with `ffmpeg -version`.
+
+**`ModuleNotFoundError: No module named 'tkinter'`**
+Linux only — tkinter is packaged separately: `sudo apt install python3-tk`.
+
+**No sound during playback**
+`sounddevice` uses your system's default output device. Change it in your OS
+sound settings, then restart the app.
+
+**No plugins in the FX window**
+Auto-Cut looks in the standard VST3 folders for your platform. VST2 plugins are
+not supported — only VST3. If you keep plugins somewhere unusual, they will not
+be found automatically.
+
+**"WhisperX was not found"**
+Transcription is optional, so you can ignore this. To enable it, either
+`pip install whisperx` or set `AUTOCUT_WHISPERX` to the full path of the
+executable (see [Transcripts](#transcripts-optional)).
+
+**Transcription is extremely slow**
+You have no NVIDIA GPU, so it is running on the CPU. Use a smaller Whisper
+model, or skip transcription — the cuts do not depend on it.
+
+**The app closed unexpectedly**
+Look at `auto_cut/autocut_crash.log`. Native crashes inside an audio plugin
+cannot be caught by Python, so they are recorded there instead. Including that
+file in a bug report helps a great deal.
+
+---
+
 ## Known limits
 
 - **Speakers must start together.** All recordings are assumed to share a
@@ -217,6 +311,13 @@ added clips that Resolve then redistributed on import.
 - Video is never re-encoded, and there is no video preview — the waveform is
   the editing surface.
 
+## Contributing
+
+Bug reports and pull requests are welcome. For a bug, the most useful things to
+include are your operating system, what you were doing, and the contents of
+`auto_cut/autocut_crash.log` if the app closed unexpectedly.
+
 ## Licence
 
-MIT — see [LICENSE](LICENSE).
+MIT — see [LICENSE](LICENSE). You can use, modify and share this freely,
+including commercially. It comes with no warranty.
