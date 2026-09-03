@@ -8,12 +8,12 @@ that it is four commands and a form.
 **Check the username in `auto_cut/version.py`.**
 
 ```python
-PROJECT_URL = "https://github.com/pcmflores/autocut-simple"
+PROJECT_URL = "https://github.com/pcmflores19-ph/autocut-simple"
 ```
 
 This is not decorative. It drives *Help ▸ Project page* and, more importantly,
 *Help ▸ Check for updates*, which turns it into a GitHub API call. If your
-GitHub username is not `pcmflores`, change it here first or the update check
+GitHub username is not `pcmflores19-ph`, change it here first or the update check
 will silently never find anything.
 
 ## One-time setup
@@ -38,7 +38,7 @@ push for no benefit.
 ### 2. Push
 
 ```bash
-git remote add origin https://github.com/<your-username>/autocut-simple.git
+git remote add origin https://github.com/pcmflores19-ph/autocut-simple.git
 git push -u origin main
 ```
 

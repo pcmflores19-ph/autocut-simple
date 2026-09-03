@@ -90,7 +90,7 @@ ffmpeg -version
 Either clone it, if you have git:
 
 ```bash
-git clone https://github.com/<you>/autocut-simple.git
+git clone https://github.com/pcmflores19-ph/autocut-simple.git
 cd autocut-simple
 ```
 

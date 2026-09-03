@@ -10,7 +10,7 @@
 #define AppName "Auto-Cut"
 #define AppExeName "AutoCut.exe"
 #define AppPublisher "Paul Flores"
-#define AppURL "https://github.com/pcmflores/autocut-simple"
+#define AppURL "https://github.com/pcmflores19-ph/autocut-simple"
 
 ; Version comes from packaging/build.py as /DAppVersion=..., which reads it
 ; out of auto_cut/version.py. The fallback is only for running ISCC by hand.
