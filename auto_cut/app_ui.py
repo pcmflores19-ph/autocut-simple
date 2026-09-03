@@ -177,8 +177,11 @@ class UIBuilderMixin:
             menu.add_command(
                 label=label,
                 command=lambda t=label, u=url: self._open_support_link(t, u))
+        # Added last, so it sits to the right of the working menus. Windows
+        # will not push it flush against the right edge: MFT_RIGHTJUSTIFY is a
+        # legacy flag that themed menu bars no longer honour - setting it
+        # succeeds, and the item then stops being drawn at all.
         menubar.add_cascade(label=f"Support {links.PODCAST_NAME}", menu=menu)
-
     def _build_status_bar(self):
         bar = ttk.Frame(self.root, style="Panel.TFrame")
         bar.pack(side="bottom", fill="x")
