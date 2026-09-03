@@ -223,7 +223,7 @@ def transcribe(audio_path, model=DEFAULT_MODEL, language=DEFAULT_LANGUAGE,
 
     if progress:
         progress(f"transcribing {os.path.basename(audio_path)} "
-                 f"({model}, {language_label(language)}, {dev}, "
+                 f"(WhisperX {model}, {language_label(language)}, {dev}, "
                  f"batch {batch_size}, {compute_type})")
         if dev == "cpu":
             progress("  no CUDA GPU found - running on the CPU, which is slow "
