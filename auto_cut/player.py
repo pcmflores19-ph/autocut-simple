@@ -20,6 +20,9 @@ import sounddevice as sd
 
 import bundled
 
+# Matches audio_export.MUTE_FADE_SECONDS - what you hear must be what you get.
+MUTE_FADE_SECONDS = 0.010
+
 SAMPLE_RATE = 44100
 CACHE_DIR = os.path.join(os.path.dirname(__file__), ".cache")
 
@@ -201,13 +204,31 @@ class Player:
 
             buf = buf * t.gain
 
-            # Silence any hand-muted region overlapping this block.
+            # Silence any muted region overlapping this block, ramping at the
+            # edges - a hard step to zero clicks, and auto-mute makes hundreds
+            # of these.
+            fade = max(1, int(MUTE_FADE_SECONDS * SAMPLE_RATE))
             for m_start, m_end in t.mute_ranges:
                 a = int(m_start * SAMPLE_RATE) - start_sample
                 b = int(m_end * SAMPLE_RATE) - start_sample
                 if b <= 0 or a >= buf.size:
                     continue
-                buf[max(0, a):min(buf.size, b)] = 0.0
+                span = min(fade, max(1, (b - a) // 2))
+                # Each edge is clipped to this block, so a mute spanning
+                # several blocks still ramps only where the edge really is.
+                fs, fe = a, min(a + span, buf.size)
+                if fe > max(0, fs):
+                    lo, hi = max(0, fs), fe
+                    ramp = np.linspace(1.0, 0.0, span, dtype=np.float32)
+                    buf[lo:hi] *= ramp[lo - fs:hi - fs]
+                body_a, body_b = max(0, a + span), min(buf.size, b - span)
+                if body_b > body_a:
+                    buf[body_a:body_b] = 0.0
+                rs, re = max(b - span, 0), b
+                if re > rs and rs < buf.size:
+                    lo, hi = max(0, rs), min(buf.size, re)
+                    ramp = np.linspace(0.0, 1.0, span, dtype=np.float32)
+                    buf[lo:hi] *= ramp[lo - rs:hi - rs]
 
             t.peak_level = float(np.abs(buf).max()) if buf.size else 0.0
             t.rms_level = float(np.sqrt(np.mean(buf * buf))) if buf.size else 0.0

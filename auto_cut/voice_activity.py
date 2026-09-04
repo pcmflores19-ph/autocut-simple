@@ -194,11 +194,17 @@ def _merge_close(intervals, max_gap):
     return [tuple(iv) for iv in out]
 
 
-def speaking_intervals(path, denoiser_path=None, duration=None, log=None):
+def speaking_intervals(path, denoiser_path=None, duration=None, log=None,
+                       with_levels=False):
     """
     Returns (start, end) ranges where this speaker is talking, found from the
     waveform. `denoiser_path` is rnnoise; without it the gate still works, just
     less cleanly on a noisy room.
+
+    With `with_levels=True` returns (intervals, levels_db, hop) instead. The
+    per-frame levels are what lets auto-mute compare one speaker against
+    another - deciding who is talking from a single microphone in isolation
+    cannot tell a real voice from the other person bleeding into it.
 
     Neither the normalization nor the denoising touches the file or the audio
     the app plays and exports - they shape a throwaway copy used to decide.
@@ -228,4 +234,6 @@ def speaking_intervals(path, denoiser_path=None, duration=None, log=None):
     if log:
         log(f"  {name}: noise floor {floor_db:.1f} dB, gate {gate_db:.1f} dB, "
             f"{len(intervals)} speech regions, {talk:.0f}s of speech")
+    if with_levels:
+        return intervals, levels_db, hop
     return intervals

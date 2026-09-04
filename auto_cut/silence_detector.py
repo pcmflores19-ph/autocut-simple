@@ -191,6 +191,86 @@ MUTE_PADDING_SECONDS = 0.25   # keep either side of speech so onsets aren't clip
 MIN_AUTO_MUTE_SECONDS = 0.6   # don't litter the track with micro-mutes between words
 
 
+# --------------------------------------------------- who is actually talking
+#
+# A lane muted purely on its own energy cannot tell a real voice from the other
+# person bleeding into the microphone. Two consequences, both heard in practice:
+# when someone laughs into your mic your gate opens and their laugh leaks
+# through your channel, and when two people laugh together the quieter one can
+# be gated off mid-laugh.
+#
+# Comparing lanes fixes both. Whoever is loudest in a moment is definitely
+# talking; anyone within LEAD_MARGIN_DB of them is talking too - which is what
+# lets both speakers stay open when they overlap. Bleed sits well below the
+# person actually producing it, so it falls outside the margin and stays muted.
+
+# Bleed is typically 10-20 dB down on the source, so 6 dB separates "we are
+# both talking" from "that is you, in my microphone".
+LEAD_MARGIN_DB = 6.0
+
+# Below this nothing counts as talking however it compares to the others -
+# without it, a silent passage would crown whichever lane happened to have the
+# loudest hiss.
+ACTIVE_FLOOR_DB = -50.0
+
+
+def active_intervals_by_lane(levels_by_lane, hop_seconds,
+                             lead_margin_db=LEAD_MARGIN_DB,
+                             floor_db=ACTIVE_FLOOR_DB,
+                             hangover_seconds=0.15,
+                             min_active_seconds=0.20):
+    """
+    Per-frame comparison across lanes -> (start, end) "this speaker is really
+    talking" intervals for each lane.
+
+    `levels_by_lane` is one dB array per lane, all on the same frame grid.
+    Lengths may differ slightly (recordings are rarely identical lengths); the
+    shortest wins and the rest are truncated.
+
+    Returns a list of interval lists, one per lane, in the same order.
+    """
+    import numpy as np
+
+    if not levels_by_lane:
+        return []
+    length = min(len(l) for l in levels_by_lane)
+    if length == 0:
+        return [[] for _ in levels_by_lane]
+
+    stacked = np.vstack([np.asarray(l[:length], dtype=np.float32)
+                         for l in levels_by_lane])
+    loudest = stacked.max(axis=0)
+    # Active where within the margin of whoever leads AND above the floor.
+    active = (stacked >= (loudest - lead_margin_db)) & (stacked > floor_db)
+
+    out = []
+    for lane in range(stacked.shape[0]):
+        out.append(_runs_to_intervals(active[lane], hop_seconds,
+                                      hangover_seconds, min_active_seconds))
+    return out
+
+
+def _runs_to_intervals(flags, hop_seconds, hangover_seconds,
+                       min_active_seconds):
+    """Boolean per-frame array -> merged, de-fluffed (start, end) seconds."""
+    import numpy as np
+
+    flags = np.asarray(flags)
+    if not flags.any():
+        return []
+    # Edges of each True run, without looping in Python over every frame.
+    padded = np.concatenate(([False], flags, [False]))
+    changes = np.flatnonzero(padded[1:] != padded[:-1])
+    starts, ends = changes[0::2], changes[1::2]
+
+    intervals = [(float(a) * hop_seconds, float(b) * hop_seconds)
+                 for a, b in zip(starts, ends)]
+    intervals = _merge_intervals(
+        [(s, e + hangover_seconds) for s, e in intervals])
+    return [(s, e - hangover_seconds) for s, e in intervals
+            if (e - hangover_seconds) - s >= min_active_seconds]
+
+
 def compute_auto_mutes_from_intervals(speaking, timeline_start, timeline_end,
                                       padding=MUTE_PADDING_SECONDS,
                                       min_mute_seconds=MIN_AUTO_MUTE_SECONDS):

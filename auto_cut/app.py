@@ -75,6 +75,8 @@ class AutoCutApp(UIBuilderMixin, ActionsMixin):
         self.speaker_media = []
         self.per_speaker_words = None
         self._saved_speech = None        # speech carried in from an opened project
+        self._speech_levels = None       # per-frame dB per lane
+        self._speech_hop = None
         self.per_speaker_speech = None   # (start, end) speech, measured from the waveform
         self.timeline_duration = 0.0
         self.peaks_list = []
@@ -387,17 +389,20 @@ class AutoCutApp(UIBuilderMixin, ActionsMixin):
                          "on a noisy room.")
 
             saved = getattr(self, "_saved_speech", None)
+            levels_per_speaker = []
+            hop = None
             if saved and len(saved) == len(self.speaker_paths):
                 self.log("  reusing the speech detected when this project was "
                          "saved (the recordings have not changed)")
                 speech_per_speaker = saved
             else:
-                speech_per_speaker = [
-                    voice_activity.speaking_intervals(path, denoiser,
-                                                      duration=duration,
-                                                      log=self.log)
-                    for path in self.speaker_paths
-                ]
+                speech_per_speaker = []
+                for path in self.speaker_paths:
+                    intervals, levels, hop = voice_activity.speaking_intervals(
+                        path, denoiser, duration=duration, log=self.log,
+                        with_levels=True)
+                    speech_per_speaker.append(intervals)
+                    levels_per_speaker.append(levels)
             self._saved_speech = None
 
             self.log("Reading waveforms ...")
@@ -405,13 +410,17 @@ class AutoCutApp(UIBuilderMixin, ActionsMixin):
 
             self.log("Preparing audio for playback ...")
             self.player.load(self.speaker_paths)
-            self._pending_auto_mutes = [
-                compute_auto_mutes_from_intervals(speech, 0.0, duration)
-                for speech in speech_per_speaker
-            ]
+            # Auto-mute is decided by comparing lanes, not per microphone.
+            # On its own a lane cannot tell your voice from the other person
+            # bleeding into your mic - which is why two people laughing used
+            # to break it.
+            self._pending_auto_mutes = self._compute_mutes(
+                speech_per_speaker, levels_per_speaker, hop, duration)
 
             self.speaker_media = media
             self.per_speaker_speech = speech_per_speaker
+            self._speech_levels = levels_per_speaker
+            self._speech_hop = hop
             self.timeline_duration = duration
             self.peaks_list = peaks_list
             self.auto_mutes = self._pending_auto_mutes
@@ -938,14 +947,39 @@ class AutoCutApp(UIBuilderMixin, ActionsMixin):
                 out.append((lane, start, end))
         return out
 
+    def _compute_mutes(self, speech_per_speaker, levels_per_speaker, hop,
+                       duration):
+        """
+        Mute ranges per lane: everywhere that speaker is not the one talking.
+
+        Uses the cross-lane comparison when per-frame levels are available -
+        anyone within a few dB of the loudest lane counts as talking, so
+        simultaneous speech keeps every one of them open. Falls back to each
+        speaker's own detected speech when levels are missing, which is the
+        case for a project saved before this existed.
+        """
+        from silence_detector import active_intervals_by_lane
+
+        basis = speech_per_speaker
+        if levels_per_speaker and hop and len(levels_per_speaker) > 1:
+            try:
+                basis = active_intervals_by_lane(levels_per_speaker, hop)
+            except Exception as exc:
+                self.log(f"  cross-lane mute detection failed ({exc}); "
+                         "falling back to per-track detection")
+                basis = speech_per_speaker
+        return [compute_auto_mutes_from_intervals(intervals, 0.0, duration)
+                for intervals in basis]
+
     def _recompute_auto_mutes(self):
         if not self.per_speaker_speech:
             self.auto_mutes = []
             return
-        self.auto_mutes = [
-            compute_auto_mutes_from_intervals(speech, 0.0, self.timeline_duration)
-            for speech in self.per_speaker_speech
-        ]
+        self.auto_mutes = self._compute_mutes(
+            self.per_speaker_speech,
+            getattr(self, "_speech_levels", None),
+            getattr(self, "_speech_hop", None),
+            self.timeline_duration)
 
     def _on_auto_cut_toggle(self):
         state = "on" if self.auto_cut_on.get() else "off"
@@ -955,6 +989,8 @@ class AutoCutApp(UIBuilderMixin, ActionsMixin):
     def _on_auto_mute_toggle(self):
         state = "on" if self.auto_mute_on.get() else "off"
         self.log(f"Auto-mute inactive speaker: {state}.")
+        if self.auto_mute_on.get() and not self.auto_mutes:
+            self._recompute_auto_mutes()
         self._apply_edits()
 
     def undo_edit(self):

@@ -23,6 +23,10 @@ from player import SAMPLE_RATE, decode_to_pcm
 
 import bundled
 
+# Ramp length at each mute edge - long enough to kill the click,
+# short enough to be inaudible as a fade.
+MUTE_FADE_SECONDS = 0.010
+
 FFMPEG = bundled.tool("ffmpeg")
 FFPROBE = bundled.tool("ffprobe")
 
@@ -70,11 +74,21 @@ def render_track(path, keep_ranges, mute_ranges=None, chain=None, gain=1.0,
         if processed.size == audio.size:
             audio = processed
 
+    # Ramp into and out of every mute. Cutting straight to zero puts a step
+    # in the waveform, and a step is a click - audible on every single mute,
+    # of which auto-mute makes hundreds.
+    fade = max(1, int(MUTE_FADE_SECONDS * SAMPLE_RATE))
     for start, end in (mute_ranges or []):
         a = max(0, int(start * SAMPLE_RATE))
         b = min(audio.size, int(end * SAMPLE_RATE))
-        if b > a:
-            audio[a:b] = 0.0
+        if b <= a:
+            continue
+        # A short mute must not fade for longer than it lasts.
+        span = min(fade, (b - a) // 2) or 1
+        audio[a:a + span] *= np.linspace(1.0, 0.0, span, dtype=np.float32)
+        audio[a + span:b - span] = 0.0
+        if b - span > a + span:
+            audio[b - span:b] *= np.linspace(0.0, 1.0, span, dtype=np.float32)
 
     if gain != 1.0:
         audio *= gain
