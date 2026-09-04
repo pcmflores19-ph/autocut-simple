@@ -92,7 +92,7 @@ exe = EXE(
     a.scripts,
     [],
     exclude_binaries=True,
-    name="AutoCut",
+    name="Wavefield",
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,
@@ -108,5 +108,5 @@ coll = COLLECT(
     a.datas,
     strip=False,
     upx=False,
-    name="AutoCut",
+    name="Wavefield",
 )

@@ -12,7 +12,7 @@ QUICK_START = """\
 WHAT THIS IS FOR
 
 Recordings where every speaker was captured to their own file - OBS Source
-Record, Riverside, local Zoom recordings. Auto-Cut finds where each person is
+Record, Riverside, local Zoom recordings. Wavefield finds where each person is
 actually talking, removes the stretches where nobody is, and exports either a
 DaVinci Resolve timeline or a finished WAV.
 
@@ -137,12 +137,12 @@ TIMELINE
 
 TROUBLESHOOTING = """\
 "ffmpeg is required" when starting
-    Auto-Cut needs ffmpeg to read audio. The installed version ships with its
+    Wavefield needs ffmpeg to read audio. The installed version ships with its
     own copy, so if you see this, try reinstalling.
 
 No sound during playback
     Playback uses whatever your operating system has set as the default output
-    device. Change it in your sound settings and restart Auto-Cut.
+    device. Change it in your sound settings and restart Wavefield.
 
 The FX window is empty
     The installed version ships its own plugins, so this should not happen -

@@ -69,7 +69,7 @@ def main():
     skip_plugins = "--skip-plugins" in sys.argv
     no_installer = "--no-installer" in sys.argv
     version = read_version()
-    print(f"Auto-Cut {version}")
+    print(f"Wavefield {version}")
 
     step(1, "icon")
     sys.path.insert(0, PACKAGING)
@@ -115,7 +115,7 @@ def main():
         cwd=PACKAGING, check=True)
 
     output = os.path.join(PACKAGING, "output",
-                          f"AutoCut-Setup-{version}.exe")
+                          f"Wavefield-Setup-{version}.exe")
     if os.path.exists(output):
         size = os.path.getsize(output) / 1e6
         print(f"\ndone: {output}  ({size:.0f} MB)")

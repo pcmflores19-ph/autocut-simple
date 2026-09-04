@@ -103,7 +103,7 @@ def resolve(force=False):
     if not candidates:
         raise RuntimeError(
             "WhisperX was not found." + NL + NL +
-            "Install it (pip install whisperx), or point Auto-Cut at it with "
+            "Install it (pip install whisperx), or point Wavefield at it with "
             "File > Settings if it lives in its own environment." + NL + NL +
             "Transcription is optional - the cuts do not depend on it."
         )

@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 """
-Auto-Cut - standalone podcast dead-air remover.
+Wavefield - standalone podcast dead-air remover.
 
 Runs outside DaVinci Resolve: measures where each speaker is talking from
 their waveform, finds the stretches where nobody is, and writes an FCPXML
@@ -25,6 +25,7 @@ from tkinter import filedialog, messagebox, ttk
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 import ui_theme
+import version
 import vst_host
 from app_actions import ActionsMixin
 from app_ui import UIBuilderMixin
@@ -66,7 +67,7 @@ LANE_COLORS = ["#57b9a6", "#c9a227", "#7a9ec2", "#c07ab8", "#9ec27a"]
 class AutoCutApp(UIBuilderMixin, ActionsMixin):
     def __init__(self, root):
         self.root = root
-        root.title("Auto-Cut - Podcast Dead Air Remover")
+        root.title(f"{version.APP_NAME} - Podcast Editor")
         self._set_window_icon(root)
         root.geometry("1280x860")
         root.minsize(1024, 700)
@@ -1371,7 +1372,7 @@ class AutoCutApp(UIBuilderMixin, ActionsMixin):
         when = data.get("autosaved_project") or "an unsaved session"
         if not messagebox.askyesno(
                 "Recover unsaved work",
-                f"Auto-Cut didn't shut down cleanly last time.\n\n"
+                f"{version.APP_NAME} didn't shut down cleanly last time.\n\n"
                 f"There's a recovered session from {os.path.basename(str(when))}.\n\n"
                 "Restore it?"):
             project_io.clear_autosave()
@@ -1960,7 +1961,7 @@ def _check_ffmpeg():
     messagebox.showerror(
         "ffmpeg is required",
         f"Could not find {' and '.join(missing)} on your PATH." + chr(10) * 2 +
-        "Auto-Cut uses ffmpeg to read and write audio, so it cannot run "
+        "Wavefield uses ffmpeg to read and write audio, so it cannot run "
         "without it." + chr(10) * 2 +
         "Windows:  winget install Gyan.FFmpeg" + chr(10) +
         "macOS:    brew install ffmpeg" + chr(10) +

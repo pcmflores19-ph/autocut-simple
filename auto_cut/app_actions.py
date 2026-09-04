@@ -11,6 +11,7 @@ import tkinter as tk
 from tkinter import filedialog, messagebox
 
 import project as project_io
+import version
 from whisperx_runner import (DEFAULT_MODEL, LANGUAGES, language_label,
                              model_label)
 
@@ -22,7 +23,7 @@ class ActionsMixin:
     def _set_project_path(self, path):
         self.project_path = path
         name = os.path.basename(path) if path else "Untitled project"
-        self.root.title(f"auto_cut  -  {name}")
+        self.root.title(f"{version.APP_NAME}  -  {name}")
         if hasattr(self, "status_label"):
             self.status_label.config(text=name)
 

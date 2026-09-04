@@ -14,6 +14,7 @@ from tkinter import filedialog, ttk
 
 import settings
 import ui_theme
+import version
 import whisperx_runner
 
 
@@ -21,7 +22,7 @@ class SettingsDialog(tk.Toplevel):
     def __init__(self, parent, log=None):
         super().__init__(parent)
         self.log = log
-        self.title("Auto-Cut - Settings")
+        self.title(f"{version.APP_NAME} - Settings")
         self.configure(background=ui_theme.BG)
         self.geometry("720x300")
         self.minsize(600, 260)
@@ -34,7 +35,7 @@ class SettingsDialog(tk.Toplevel):
                   style="PanelDim.TLabel").pack(anchor="w")
         ttk.Label(frame, style="PanelDim.TLabel", justify="left",
                   wraplength=660,
-                  text="Auto-Cut finds WhisperX by itself in the usual places. "
+                  text="Wavefield finds WhisperX by itself in the usual places. "
                        "If you installed it into its own environment - which is "
                        "the sensible way to do it, and is never on the PATH - "
                        "point at it here.").pack(anchor="w", pady=(2, 10))

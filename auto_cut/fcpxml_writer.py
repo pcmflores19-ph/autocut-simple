@@ -148,7 +148,7 @@ def _split_on_mutes(seg_start_f, seg_end_f, mute_frames):
     return pieces
 
 
-def build_fcpxml(speaker_media, keep_ranges, project_name="Podcast (Auto-Cut)",
+def build_fcpxml(speaker_media, keep_ranges, project_name="Podcast (Wavefield)",
                  mutes=None):
     """
     speaker_media: list of MediaInfo (from media_probe.probe), speaker 1 first.
@@ -261,7 +261,7 @@ def build_fcpxml(speaker_media, keep_ranges, project_name="Podcast (Auto-Cut)",
 {chr(10).join(resources)}
   </resources>
   <library>
-    <event name="Auto-Cut">
+    <event name="Wavefield">
       <project name="{escape(project_name)}">
         <sequence format="r0" duration="{sequence_duration}" tcStart="0s" tcFormat="NDF" audioLayout="mono" audioRate="48kHz">
           <spine>
@@ -275,7 +275,7 @@ def build_fcpxml(speaker_media, keep_ranges, project_name="Podcast (Auto-Cut)",
 """
 
 
-def write_fcpxml(path, speaker_media, keep_ranges, project_name="Podcast (Auto-Cut)",
+def write_fcpxml(path, speaker_media, keep_ranges, project_name="Podcast (Wavefield)",
                  mutes=None):
     xml = build_fcpxml(speaker_media, keep_ranges, project_name, mutes=mutes)
     with open(path, "w", encoding="utf-8") as f:

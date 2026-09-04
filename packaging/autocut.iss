@@ -7,8 +7,8 @@
 ; Produces packaging/output/AutoCut-Setup-<version>.exe - one file to hand to
 ; someone, no Python and no ffmpeg needed on their machine.
 
-#define AppName "Auto-Cut"
-#define AppExeName "AutoCut.exe"
+#define AppName "Wavefield"
+#define AppExeName "Wavefield.exe"
 #define AppPublisher "Paul Flores"
 #define AppURL "https://github.com/pcmflores19-ph/autocut-simple"
 
@@ -39,7 +39,7 @@ PrivilegesRequiredOverridesAllowed=dialog
 PrivilegesRequired=lowest
 
 OutputDir=output
-OutputBaseFilename=AutoCut-Setup-{#AppVersion}
+OutputBaseFilename=Wavefield-Setup-{#AppVersion}
 Compression=lzma2/max
 SolidCompression=yes
 WizardStyle=modern

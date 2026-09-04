@@ -3,7 +3,7 @@ Renders a finished video file, for people who do not use DaVinci Resolve.
 
 The FCPXML export hands Resolve a timeline and lets it do the work. This does
 the work itself: keeps only the ranges that survived the edit, and muxes them
-against the audio Auto-Cut already rendered - cuts, mutes, effects and levels
+against the audio Wavefield already rendered - cuts, mutes, effects and levels
 included.
 
 The video HAS to be re-encoded. Cuts land wherever the speech stops, which is
@@ -56,44 +56,57 @@ def has_nvenc():
     return _nvenc_cache
 
 
-def _filter_graph(keep_ranges, width, height, fps,
-                  intro_kind=None, outro_kind=None):
+def _filter_graph(segments, width, height, fps,
+                  intro_kind=None, outro_kind=None, source_count=1):
     """
-    trim/setpts per keep range, concatenated - the standard way to cut a video
-    at arbitrary points.
+    trim/setpts per segment, concatenated - the standard way to cut a video at
+    arbitrary points.
 
-    Only the episode is cut here. The audio comes from the WAV Auto-Cut
+    `segments` is [(source_index, start, end)]. With one camera every segment
+    names source 0 and this is a plain cut-and-join; for a vodcast the source
+    index changes as the camera switches, and the only difference is which
+    input each piece trims from.
+
+    Every piece is conformed to the same size, rate and pixel format before
+    concatenation - concat refuses inputs that disagree, and a V3 recorded at a
+    different resolution is entirely normal.
+
+    Only the picture is cut here. The audio comes from the WAV Wavefield
     rendered, which is already cut, muted and processed, so re-deriving it
     would both duplicate the work and risk the two drifting apart.
 
     `intro_kind` / `outro_kind` are None, "black" or "video". Intro and outro
     audio needs picture to sit against or everything after it drifts; a video
-    bookend supplies its own, and anything else gets black. Either way the
-    bookend is scaled and padded to the episode's exact size and frame rate,
-    because concat refuses inputs that do not match.
+    bookend supplies its own, and anything else gets black.
     """
     parts = []
-    for i, (start, end) in enumerate(keep_ranges):
-        parts.append(
-            f"[0:v]trim=start={start:.6f}:end={end:.6f},"
-            f"setpts=PTS-STARTPTS[v{i}]")
 
-    def conform(source, label):
-        # Letterbox rather than stretch: an intro shot in a different aspect
-        # ratio should keep its shape.
-        return (f"[{source}:v]scale={width}:{height}:force_original_"
-                f"aspect_ratio=decrease,pad={width}:{height}:-1:-1:color=black,"
-                f"fps={fps},setsar=1,format=yuv420p,setpts=PTS-STARTPTS[{label}]")
+    def conform(source, label, trim=None):
+        # Letterbox rather than stretch: a camera framed differently should
+        # keep its shape rather than be squashed to fit.
+        chain = f"[{source}:v]"
+        if trim is not None:
+            chain += f"trim=start={trim[0]:.6f}:end={trim[1]:.6f},"
+        chain += (f"scale={width}:{height}:force_original_aspect_ratio=decrease,"
+                  f"pad={width}:{height}:-1:-1:color=black,fps={fps},setsar=1,"
+                  f"format=yuv420p,setpts=PTS-STARTPTS[{label}]")
+        return chain
+
+    # Bookends come in after the video sources and the audio.
+    bookend_input = source_count + 1
 
     labels = []
-    next_input = 2                       # 0 is the episode, 1 its audio
     if intro_kind:
-        parts.append(conform(next_input, "intro"))
+        parts.append(conform(bookend_input, "intro"))
         labels.append("[intro]")
-        next_input += 1
-    labels += [f"[v{i}]" for i in range(len(keep_ranges))]
+        bookend_input += 1
+
+    for i, (source, start, end) in enumerate(segments):
+        parts.append(conform(source, f"v{i}", trim=(start, end)))
+        labels.append(f"[v{i}]")
+
     if outro_kind:
-        parts.append(conform(next_input, "outro"))
+        parts.append(conform(bookend_input, "outro"))
         labels.append("[outro]")
 
     parts.append(f"{''.join(labels)}concat=n={len(labels)}:v=1:a=0[outv]")
@@ -125,9 +138,18 @@ def _bookend_input(path, seconds, width, height, fps):
 def render(video_path, audio_path, out_path, keep_ranges, crf=DEFAULT_CRF,
            use_gpu=None, progress=None, should_cancel=None,
            intro_seconds=0.0, outro_seconds=0.0,
-           intro_path=None, outro_path=None):
+           intro_path=None, outro_path=None,
+           segments=None, sources=None):
     """
     Writes `out_path` from `video_path`'s picture and `audio_path`'s sound.
+
+    For a vodcast, pass `sources` (the camera files, V1/V2/V3) and `segments`
+    ([(camera_index, start, end)] from scenes.apply_to_keep_ranges); the cut
+    then moves between cameras. Without them every segment comes from
+    `video_path` and this is an ordinary single-camera export.
+
+    V3 is only ever a picture source - its audio is the same two voices again
+    and is never opened.
 
     `audio_path` is expected to already include any intro and outro; pass their
     durations so matching black can be put in front of and after the picture.
@@ -136,11 +158,16 @@ def render(video_path, audio_path, out_path, keep_ranges, crf=DEFAULT_CRF,
     should_cancel() is polled; returning True stops the render and removes the
     partial file.
     """
-    if not keep_ranges:
+    if segments is None:
+        segments = [(0, start, end) for start, end in keep_ranges]
+    if not segments:
         raise ValueError("Nothing to export - no segments survived the edit.")
+    if not sources:
+        sources = [video_path]
 
-    info = probe(video_path)
-    total = (sum(end - start for start, end in keep_ranges)
+    # The first camera sets the format everything else is conformed to.
+    info = probe(sources[0])
+    total = (sum(end - start for _source, start, end in segments)
              + intro_seconds + outro_seconds)
     if use_gpu is None:
         use_gpu = has_nvenc()
@@ -160,14 +187,19 @@ def render(video_path, audio_path, out_path, keep_ranges, crf=DEFAULT_CRF,
     if progress and (intro_kind == "video" or outro_kind == "video"):
         progress(0.0, "using the picture from your intro/outro")
 
+    source_args = []
+    for source in sources:
+        source_args += ["-i", source]
+
     cmd = [
         FFMPEG, "-y", "-hide_banner",
-        "-i", video_path,
+        *source_args,
         "-i", audio_path,
         *intro_args, *outro_args,
-        "-filter_complex", _filter_graph(keep_ranges, info.width, info.height,
-                                         rate, intro_kind, outro_kind),
-        "-map", "[outv]", "-map", "1:a:0",
+        "-filter_complex", _filter_graph(segments, info.width, info.height,
+                                         rate, intro_kind, outro_kind,
+                                         source_count=len(sources)),
+        "-map", "[outv]", "-map", f"{len(sources)}:a:0",
         *video_codec,
         "-pix_fmt", "yuv420p",          # anything else will not play everywhere
         "-c:a", "aac", "-b:a", "192k",
@@ -223,7 +255,8 @@ def render(video_path, audio_path, out_path, keep_ranges, crf=DEFAULT_CRF,
                           should_cancel=should_cancel,
                           intro_seconds=intro_seconds,
                           outro_seconds=outro_seconds,
-                          intro_path=intro_path, outro_path=outro_path)
+                          intro_path=intro_path, outro_path=outro_path,
+                          segments=segments, sources=sources)
         raise RuntimeError("ffmpeg could not write the video:" + NL + NL
                            + "".join(tail[-12:]))
     return out_path
