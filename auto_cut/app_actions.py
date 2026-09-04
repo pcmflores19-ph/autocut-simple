@@ -11,7 +11,8 @@ import tkinter as tk
 from tkinter import filedialog, messagebox
 
 import project as project_io
-from whisperx_runner import LANGUAGES, language_label, model_label
+from whisperx_runner import (DEFAULT_MODEL, LANGUAGES, language_label,
+                             model_label)
 
 
 class ActionsMixin:
@@ -40,6 +41,29 @@ class ActionsMixin:
         self.transcript = None
         self.intro_path = None
         self.outro_path = None
+
+        # A new project must look like a fresh start. Leaving the previous
+        # episode's transcript, log and effects on screen makes it far too
+        # easy to believe they belong to the new one.
+        self.per_speaker_words = None
+        self.per_speaker_speech = None
+        self._speech_levels = None
+        self._speech_hop = None
+        self._saved_speech = None
+        self.auto_mutes = []
+        self.speaker_media = []
+        self._pending_project = None
+        self.whisper_model.set(DEFAULT_MODEL)
+        self.model_box.set(model_label(DEFAULT_MODEL))
+        self.aggressiveness.set(50)
+        self.auto_mute_on.set(False)
+        self.auto_cut_on.set(True)
+
+        self._render_transcript()          # clears the transcript panel
+        self._build_mixer()                # drops the old per-track FX buttons
+        if hasattr(self, "log_text"):
+            self.log_text.delete("1.0", "end")
+
         self._invalidate_analysis()
         self._set_project_path(None)
         self.log("New project.")
@@ -146,10 +170,12 @@ class ActionsMixin:
             self.model_box.set(model_label(model))
 
         self._pending_project = data      # chains/tracks restored after analysis
+        # Intro/outro moved to the Export menu, which has nowhere to show a
+        # filename, so the log is where they are reported now.
         for attr in ("intro", "outro"):
-            path = getattr(self, f"{attr}_path")
-            getattr(self, f"{attr}_label").config(
-                text=os.path.basename(path) if path else "(none)")
+            path = getattr(self, f"{attr}_path", None)
+            if path:
+                self.log(f"{attr.capitalize()}: {os.path.basename(path)}")
 
         self._invalidate_analysis()
         self._build_mixer()

@@ -44,8 +44,11 @@ class FxDialog(tk.Toplevel):
         wrap.pack(fill="both", expand=True, padx=8, pady=8)
         vsb = ttk.Scrollbar(wrap, orient="vertical")
         hsb = ttk.Scrollbar(wrap, orient="horizontal")
+        options = dict(ui_theme.listbox_options())
+        options.update(kwargs)
         box = tk.Listbox(wrap, exportselection=False,
-                         yscrollcommand=vsb.set, xscrollcommand=hsb.set, **kwargs)
+                         yscrollcommand=vsb.set, xscrollcommand=hsb.set,
+                         **options)
         vsb.config(command=box.yview)
         hsb.config(command=box.xview)
         box.grid(row=0, column=0, sticky="nsew")
@@ -68,25 +71,39 @@ class FxDialog(tk.Toplevel):
         top.columnconfigure(0, weight=1)
         top.columnconfigure(1, weight=1)
 
-        # Available effects (left): the built-in ones first, because they are
-        # the ones that are always there and always work.
-        avail_frame = ttk.LabelFrame(
-            top, text=f"Available  ({len(effects.EFFECTS)} built in, "
-                      f"{len(self.available)} VST3)")
-        avail_frame.grid(row=0, column=0, sticky="nsew", padx=(0, 5))
+        # Built-in effects and VST3 plugins get a box each. Tagging one list
+        # with "(VST3)" on every row was noise - the split says it once.
+        left = ttk.Frame(top)
+        left.grid(row=0, column=0, sticky="nsew", padx=(0, 5))
+        left.rowconfigure(0, weight=0)
+        left.rowconfigure(1, weight=1)
+        left.columnconfigure(0, weight=1)
 
-        self.avail_list = self._scrolled_listbox(avail_frame, height=10)
-        # (kind, key_or_path) parallel to what is shown.
-        self.avail_items = []
-        for key, label, _fn, _params in effects.EFFECTS:
-            self.avail_list.insert("end", label)
-            self.avail_items.append(("native", key))
-        for name, path in self.available:
-            self.avail_list.insert("end", f"{name}   (VST3)")
-            self.avail_items.append(("vst3", path))
-        self.avail_list.bind("<Double-Button-1>", lambda e: self._add())
-        ttk.Button(avail_frame, text="Add to chain  ->",
-                   command=self._add).pack(padx=8, pady=(0, 8))
+        builtin_frame = ttk.LabelFrame(left, text="Effects")
+        builtin_frame.grid(row=0, column=0, sticky="nsew", pady=(0, 6))
+        self.builtin_list = self._scrolled_listbox(
+            builtin_frame, height=len(effects.EFFECTS))
+        for _key, label, _fn, _params in effects.EFFECTS:
+            self.builtin_list.insert("end", label)
+        self.builtin_list.bind("<Double-Button-1>", lambda e: self._add_builtin())
+        self.builtin_list.bind(
+            "<<ListboxSelect>>",
+            lambda e: self.vst_list.selection_clear(0, "end"))
+        ttk.Button(builtin_frame, text="Add to chain  ->",
+                   command=self._add_builtin).pack(padx=8, pady=(0, 8))
+
+        vst_frame = ttk.LabelFrame(
+            left, text=f"VST3 plugins ({len(self.available)} found)")
+        vst_frame.grid(row=1, column=0, sticky="nsew")
+        self.vst_list = self._scrolled_listbox(vst_frame, height=6)
+        for name, _path in self.available:
+            self.vst_list.insert("end", name)
+        self.vst_list.bind("<Double-Button-1>", lambda e: self._add_vst())
+        self.vst_list.bind(
+            "<<ListboxSelect>>",
+            lambda e: self.builtin_list.selection_clear(0, "end"))
+        ttk.Button(vst_frame, text="Add to chain  ->",
+                   command=self._add_vst).pack(padx=8, pady=(0, 8))
 
         # Chain (right)
         chain_frame = ttk.LabelFrame(top, text="Chain (signal flows top to bottom)")
@@ -131,7 +148,7 @@ class FxDialog(tk.Toplevel):
     # ---------- chain operations ----------
 
     def _show_params(self):
-        """Rebuilds the slider panel for the selected chain entry."""
+        """Rebuilds the settings panel for whatever is selected in the chain."""
         for child in self.params_frame.winfo_children():
             child.destroy()
 
@@ -140,32 +157,64 @@ class FxDialog(tk.Toplevel):
             index < len(self.chain.slots) else None
         if slot is None or not getattr(slot, "is_native", False):
             ttk.Label(self.params_frame,
-                      text="Select a built-in effect to change its settings. "
+                      text="Select an effect to change its settings. "
                            "VST3 plugins open their own window.",
-                      foreground="#888").pack(anchor="w", padx=8, pady=6)
+                      style="PanelDim.TLabel").pack(anchor="w", padx=8, pady=6)
             return
 
         _label, _fn, spec = effects.BY_KEY[slot.key]
-        grid = ttk.Frame(self.params_frame)
+        grid = ttk.Frame(self.params_frame, style="Panel.TFrame")
         grid.pack(fill="x", padx=8, pady=6)
         grid.columnconfigure(1, weight=1)
 
-        for row, (name, caption, lo, hi, _default, unit) in enumerate(spec):
-            ttk.Label(grid, text=caption, width=15).grid(
-                row=row, column=0, sticky="w", pady=1)
-            var = tk.DoubleVar(value=float(slot.params.get(name, _default)))
-            value_label = ttk.Label(grid, width=11, anchor="e")
+        for row, (name, caption, lo, hi, default, unit) in enumerate(spec):
+            ttk.Label(grid, text=caption, width=16, style="Panel.TLabel").grid(
+                row=row, column=0, sticky="w", pady=2)
 
-            def on_change(_v, s=slot, n=name, v=var, lbl=value_label, u=unit):
-                s.params[n] = float(v.get())
-                lbl.config(text=f"{v.get():.1f} {u}")
+            var = tk.DoubleVar(value=float(slot.params.get(name, default)))
+            entry_var = tk.StringVar(value=f"{var.get():g}")
+
+            def commit(value, s=slot, n=name, v=var, ev=entry_var,
+                       lo=lo, hi=hi):
+                value = max(lo, min(hi, float(value)))
+                s.params[n] = value
+                v.set(value)
+                ev.set(f"{value:g}")
                 self.on_change()
 
+            def on_slide(_v, v=var, c=commit):
+                c(v.get())
+
+            def on_typed(_e=None, ev=entry_var, c=commit, v=var):
+                # A slider is fine for a rough sweep and hopeless for "-18".
+                try:
+                    c(float(ev.get()))
+                except ValueError:
+                    ev.set(f"{v.get():g}")      # put back what it was
+                return "break"
+
             scale = ttk.Scale(grid, from_=lo, to=hi, orient="horizontal",
-                              variable=var, command=on_change)
-            scale.grid(row=row, column=1, sticky="ew", padx=6)
-            value_label.grid(row=row, column=2, sticky="e")
-            value_label.config(text=f"{var.get():.1f} {unit}")
+                              variable=var, command=on_slide)
+            scale.grid(row=row, column=1, sticky="ew", padx=8)
+
+            entry = ttk.Entry(grid, textvariable=entry_var, width=7,
+                              justify="right")
+            entry.grid(row=row, column=2, sticky="e")
+            entry.bind("<Return>", on_typed)
+            entry.bind("<FocusOut>", on_typed)
+
+            ttk.Label(grid, text=unit, width=5,
+                      style="PanelDim.TLabel").grid(row=row, column=3,
+                                                    sticky="w", padx=(4, 0))
+
+        ttk.Button(grid, text="Reset to defaults", width=18,
+                   command=lambda s=slot: self._reset_params(s)).grid(
+                       row=len(spec), column=1, sticky="w", padx=8, pady=(8, 2))
+
+    def _reset_params(self, slot):
+        slot.params = dict(effects.defaults(slot.key))
+        self.on_change()
+        self._show_params()
 
     def _selected_index(self):
         sel = self.chain_list.curselection()
@@ -183,32 +232,34 @@ class FxDialog(tk.Toplevel):
         if hasattr(self, "params_frame"):
             self._show_params()
 
-    def _add(self):
-        sel = self.avail_list.curselection()
+    def _add_builtin(self):
+        sel = self.builtin_list.curselection()
         if not sel:
             return
-        kind, value = self.avail_items[sel[0]]
+        key = effects.EFFECTS[sel[0]][0]
+        self.chain.add_native(key)
+        self.log(f"Added {effects.BY_KEY[key][0]}.")
+        self._refresh_chain()
+        # Select what was just added, so its sliders appear straight away.
+        self.chain_list.selection_clear(0, "end")
+        self.chain_list.selection_set(len(self.chain.slots) - 1)
+        self._show_params()
 
-        if kind == "native":
-            self.chain.add_native(value)
-            self.log(f"Added {effects.BY_KEY[value][0]}.")
-            self._refresh_chain()
-            self._show_params()
+    def _add_vst(self):
+        sel = self.vst_list.curselection()
+        if not sel:
             return
-
-        name = self.avail_list.get(sel[0]).split("   (VST3)")[0]
+        name, path = self.available[sel[0]]
         # Loading a plugin while the audio callback is inside one is a native
         # crash, so playback stops first.
-        was_playing = bool(self.player and self.player.is_playing)
-        if was_playing:
+        if self.player and self.player.is_playing:
             self.player.stop()
         try:
-            self.chain.add(name, value)
+            self.chain.add(name, path)
             self.log(f"Added {name}.")
         except Exception as exc:
             messagebox.showerror("Could not load plugin",
                                  f"{name}\n\n{exc}", parent=self)
-            return
         finally:
             self._refresh_chain()
 

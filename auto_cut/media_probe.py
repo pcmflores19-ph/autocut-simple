@@ -24,6 +24,10 @@ class MediaInfo:
         self.audio_channels = audio_channels
 
     @property
+    def has_video(self):
+        return self.width > 0 and self.height > 0
+
+    @property
     def fps_float(self):
         return float(self.fps)
 
@@ -47,13 +51,23 @@ def probe(path):
     streams = data.get("streams", [])
 
     video = next((s for s in streams if s.get("codec_type") == "video"), None)
-    if video is None:
-        raise RuntimeError(f"No video stream found in {path}")
     audio = next((s for s in streams if s.get("codec_type") == "audio"), None)
+    if video is None and audio is None:
+        raise RuntimeError(f"No audio or video stream found in {path}")
     has_audio = audio is not None
     # Declared in the FCPXML: telling Resolve a mono source is stereo made it
     # allocate extra audio tracks on import.
     audio_channels = int(audio.get("channels", 1)) if audio else 1
+
+    # A plain WAV or MP3 is a perfectly good source for an audio podcast, so
+    # audio-only files are allowed. They just cannot be exported as a timeline
+    # or a video - the app disables those when no source has a picture.
+    if video is None:
+        duration = audio.get("duration") or data.get("format", {}).get("duration")
+        if duration is None:
+            raise RuntimeError(f"Could not determine duration for {path}")
+        return MediaInfo(path, Fraction(30, 1), 0, 0, float(duration),
+                         has_audio, audio_channels=audio_channels)
 
     # r_frame_rate is the real (not average) rate, e.g. "30000/1001"
     fps = Fraction(video.get("r_frame_rate", "30/1"))

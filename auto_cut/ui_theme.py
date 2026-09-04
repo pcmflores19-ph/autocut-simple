@@ -55,7 +55,11 @@ def apply(root):
     style.configure("Title.TLabel", background=BG, foreground=TEXT, font=FONT_TITLE)
     style.configure("Value.TLabel", background=BG, foreground=ACCENT, font=FONT_BOLD)
 
+    # clam draws a Labelframe's border from lightcolor/darkcolor, NOT from
+    # bordercolor - setting bordercolor alone left thick white boxes on a dark
+    # window however thin the border was asked to be.
     style.configure("TLabelframe", background=BG, bordercolor=BORDER,
+                    lightcolor=BORDER, darkcolor=BORDER,
                     relief="solid", borderwidth=1)
     style.configure("TLabelframe.Label", background=BG, foreground=TEXT_DIM,
                     font=FONT_SMALL)
@@ -93,9 +97,17 @@ def apply(root):
     style.map("TRadiobutton", background=[("active", BG)],
               indicatorcolor=[("selected", ACCENT)])
 
+    style.configure("TEntry", fieldbackground=PANEL_LIGHT, foreground=TEXT,
+                    bordercolor=BORDER, insertcolor=ACCENT, padding=2)
+
     style.configure("TScale", background=BG, troughcolor=PANEL_LIGHT,
                     bordercolor=BORDER)
-    style.configure("Horizontal.TScale", background=BG, troughcolor=PANEL_LIGHT)
+    # A slider you can actually see: an accent-coloured handle on a dark
+    # trough, thick enough to grab.
+    style.configure("Horizontal.TScale", background=BG,
+                    troughcolor=TIMELINE_BG, bordercolor=BORDER,
+                    lightcolor=ACCENT, darkcolor=ACCENT_DIM,
+                    sliderthickness=16, sliderrelief="flat")
 
     style.configure("TScrollbar", background=PANEL_LIGHT, troughcolor=PANEL,
                     bordercolor=BORDER, arrowcolor=TEXT_DIM)

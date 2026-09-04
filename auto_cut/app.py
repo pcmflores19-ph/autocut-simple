@@ -251,8 +251,21 @@ class AutoCutApp(UIBuilderMixin, ActionsMixin):
     def add_files(self):
         paths = filedialog.askopenfilenames(
             title="Select speaker recordings",
-            filetypes=[("Media files", "*.mp4 *.mkv *.mov *.avi *.wav *.mp3 *.m4a"),
-                       ("All files", "*.*")],
+            # ffmpeg reads far more than this; the list is only what the
+            # dialog offers to filter by. "All files" is kept last precisely
+            # so an unusual format is never actually blocked.
+            filetypes=[
+                ("Media files",
+                 "*.mp4 *.mkv *.mov *.avi *.webm *.flv *.wmv *.m4v *.mpg "
+                 "*.mpeg *.ts *.mts *.m2ts "
+                 "*.wav *.mp3 *.m4a *.aac *.flac *.ogg *.opus *.wma *.aiff "
+                 "*.aif *.caf"),
+                ("Video", "*.mp4 *.mkv *.mov *.avi *.webm *.flv *.wmv *.m4v "
+                          "*.mpg *.mpeg *.ts *.mts *.m2ts"),
+                ("Audio", "*.wav *.mp3 *.m4a *.aac *.flac *.ogg *.opus *.wma "
+                          "*.aiff *.aif *.caf"),
+                ("All files", "*.*"),
+            ],
         )
         for path in paths:
             if path not in self.speaker_paths:
@@ -1592,23 +1605,60 @@ class AutoCutApp(UIBuilderMixin, ActionsMixin):
                          args=(path, keep_ranges), daemon=True).start()
 
     def _export_audio_worker(self, path, keep_ranges):
+        import time
         try:
             gains = [t.gain for t in self.player.tracks]
+            total = len(self.speaker_paths)
+            started = time.perf_counter()
+
+            def progress(message):
+                # export_audio names the file it is on; turn that into a real
+                # fraction and an estimate, rather than a bar swinging about
+                # telling the user nothing.
+                self.log(message)
+                done = sum(1 for p in self.speaker_paths
+                           if os.path.basename(p) in message)
+                for index, speaker in enumerate(self.speaker_paths):
+                    if os.path.basename(speaker) in message:
+                        fraction = (index + 0.5) / max(1, total)
+                        elapsed = time.perf_counter() - started
+                        remaining = ""
+                        if fraction > 0.05:
+                            left = elapsed / fraction - elapsed
+                            remaining = f" - about {self._format_eta(left)} left"
+                        self._export_step(
+                            f"{message}{remaining}", fraction * 0.9)
+                        return
+                self._export_step(message, None)
+
             written, peak = export_audio(
                 path, self.speaker_paths, keep_ranges,
                 mutes=self.effective_mutes(), chains=self.track_chains,
                 gains=gains, stems=self.export_stems.get(),
                 intro_path=self.intro_path, outro_path=self.outro_path,
-                progress=self.log,
+                progress=progress,
             )
+            self._export_step("Writing files...", 0.95)
             written += self._write_transcript_files(path, keep_ranges)
-            total = sum(e - s for s, e in keep_ranges)
-            self.log(f"Exported {total / 60:.1f} min of audio to {len(written)} file(s).")
+            total_seconds = sum(e - s for s, e in keep_ranges)
+            self.log(f"Exported {total_seconds / 60:.1f} min of audio to "
+                     f"{len(written)} file(s).")
             self._export_step("Finished.", 1.0)
             self.root.after(0, lambda: self._export_audio_done(written, peak))
         except Exception as exc:
             self.log(f"ERROR exporting audio: {exc}")
             self.root.after(0, lambda: self._export_audio_failed(exc))
+
+    @staticmethod
+    def _format_eta(seconds):
+        seconds = max(0, int(seconds))
+        if seconds < 60:
+            return f"{seconds}s"
+        minutes, seconds = divmod(seconds, 60)
+        if minutes < 60:
+            return f"{minutes}m {seconds:02d}s"
+        hours, minutes = divmod(minutes, 60)
+        return f"{hours}h {minutes:02d}m"
 
     # ---------- exports run behind a modal dialog ----------
 
@@ -1689,17 +1739,38 @@ class AutoCutApp(UIBuilderMixin, ActionsMixin):
             if self._export_cancelled():
                 raise KeyboardInterrupt
 
+            # Intro and outro go on last, at their own level, exactly as the
+            # WAV export does - so the two exports sound identical.
+            intro_seconds = outro_seconds = 0.0
+            bookends = []
+            if self.intro_path:
+                self._export_step("Adding intro...", None)
+                intro = decode_audio_file(self.intro_path)
+                intro_seconds = intro.size / PLAYER_SAMPLE_RATE
+                bookends.append(intro)
+            bookends.append(mix)
+            if self.outro_path:
+                self._export_step("Adding outro...", None)
+                outro = decode_audio_file(self.outro_path)
+                outro_seconds = outro.size / PLAYER_SAMPLE_RATE
+                bookends.append(outro)
+            if len(bookends) > 1:
+                import numpy as np
+                mix = np.concatenate(bookends)
+
             fd, temp_wav = tempfile.mkstemp(prefix="autocut_video_",
                                             suffix=".wav")
             os.close(fd)
             write_wav(temp_wav, mix)
 
-            # 2. the picture, cut to the same ranges
+            # 2. the picture, cut to the same ranges, with black behind the
+            #    intro and outro so the sound never runs past the picture.
             self._export_step("Encoding video...", 0.0)
             result = video_export.render(
                 source, temp_wav, path, keep_ranges,
                 progress=lambda f, m: self._export_step(m, f),
-                should_cancel=self._export_cancelled)
+                should_cancel=self._export_cancelled,
+                intro_seconds=intro_seconds, outro_seconds=outro_seconds)
 
             if result is None:
                 self.log("Video export cancelled.")

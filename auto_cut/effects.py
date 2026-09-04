@@ -191,7 +191,20 @@ def eq3(samples, sample_rate, low_db=0.0, mid_db=0.0, high_db=0.0):
         return samples
 
     def one_pole_low(x, cutoff):
+        """
+        y[n] = (1-a)*x[n] + a*y[n-1]
+
+        A one-pole IIR: each output depends on the last, so it cannot be
+        vectorised. scipy does it in C when available - roughly a hundred times
+        faster over a full episode - and the loop is the fallback, since the
+        frozen build deliberately excludes scipy to keep the installer small.
+        """
         a = float(np.exp(-2.0 * np.pi * cutoff / sample_rate))
+        try:
+            from scipy.signal import lfilter
+            return lfilter([1.0 - a], [1.0, -a], x).astype(np.float32)
+        except Exception:
+            pass
         out = np.empty_like(x)
         state = 0.0
         for i in range(x.size):

@@ -576,7 +576,21 @@ class UIBuilderMixin:
         self._set_export_enabled(False)
 
     def _set_export_enabled(self, enabled):
+        """
+        Enables the export entries, minus any that need a picture.
+
+        A WAV or MP3 source is fine for an audio podcast, but there is no
+        video to put on a Resolve timeline or encode into an MP4 - so those
+        two are left greyed out rather than failing halfway through.
+        """
         state = "normal" if enabled else "disabled"
+        has_video = any(getattr(m, "has_video", True)
+                        for m in (self.speaker_media or []))
+        # (0) FCPXML timeline, (1) WAV, (2) MP4 - only the WAV works audio-only.
+        needs_video = {0, 2}
         for index in self.export_menu_entries:
-            self.export_menu.entryconfig(index, state=state)
+            allowed = state
+            if enabled and index in needs_video and not has_video:
+                allowed = "disabled"
+            self.export_menu.entryconfig(index, state=allowed)
 
