@@ -242,6 +242,25 @@ class ActionsMixin:
             text = " ".join((segment.get("text") or "").split())
             self.transcript_text.insert("end", f"[{stamp}] ", ("stamp",))
             self.transcript_text.insert("end", text + chr(10))
+        self._retag_transcript_stamps()
+
+    def _retag_transcript_stamps(self):
+        """
+        Recolours every [m:ss] at the start of a line.
+
+        Typing inside the editor can knock a bracket out of the "stamp" tag
+        (see the KeyRelease binding that calls this) - re-deriving the tag
+        from what is actually on screen is simpler and more reliable than
+        patching the tag range up as edits happen.
+        """
+        text = self.transcript_text
+        text.tag_remove("stamp", "1.0", "end")
+        line_count = int(text.index("end-1c").split(".")[0])
+        for line in range(1, line_count + 1):
+            content = text.get(f"{line}.0", f"{line}.end")
+            match = re.match(r"^\[\d+:\d{2}\]", content)
+            if match:
+                text.tag_add("stamp", f"{line}.0", f"{line}.{match.end()}")
 
     def _on_transcript_click(self, event):
         """Double-clicking a line seeks playback to it."""

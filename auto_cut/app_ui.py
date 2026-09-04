@@ -267,6 +267,15 @@ class UIBuilderMixin:
         self.transcript_text.tag_configure("current", background=ui_theme.SELECT,
                                            foreground="#ffffff")
         self.transcript_text.bind("<Double-Button-1>", self._on_transcript_click)
+        # A Text widget's tags belong to characters, not regions: deleting a
+        # character at the edge of the "stamp" tag shrinks it, and text typed
+        # back into that gap does not reacquire it - it just comes out in the
+        # default colour. Reapplying the tag after every edit is simpler than
+        # trying to out-think Tk's tag gravity.
+        self.transcript_text.bind("<KeyRelease>",
+                                  lambda _e: self._retag_transcript_stamps())
+        self.transcript_text.bind("<<Paste>>",
+                                  lambda _e: self.root.after_idle(self._retag_transcript_stamps))
 
         # The log used to live on the export page. With that page gone it has
         # to be here: every long job - analysis, transcription, rendering -
