@@ -1,9 +1,9 @@
-# Auto-Cut
+# Wavefield
 
 **Removes the dead air from your podcast recordings, automatically.**
 
 If you record a podcast where each person is on their own audio file — OBS,
-Riverside, Zoom, StreamYard — Auto-Cut listens to each track, finds the long
+Riverside, Zoom, StreamYard — Wavefield listens to each track, finds the long
 silences where nobody is talking, and cuts them out. What normally takes an
 evening of dragging clips around takes a couple of minutes.
 
@@ -17,10 +17,15 @@ uploaded anywhere.
 
 ## Download
 
-### [⬇ Download Auto-Cut for Windows](../../releases/latest)
+### [⬇ Download Wavefield for Windows](../../releases/latest)
 
 Open the file you downloaded and click through the installer. That's it — you
 don't need to install anything else first.
+
+At the end it offers to **set up speech recognition**. Leave that ticked if you
+want transcripts and subtitles: it downloads about 2-3 GB in its own window and
+takes 5-15 minutes, once. Everything else works without it, and you can always
+do it later from **File > Settings**.
 
 > **Windows will show a blue warning box** saying *"Windows protected your PC"*.
 > This is normal. It appears for any program whose author hasn't paid Microsoft
@@ -47,7 +52,7 @@ Riverside give you automatically.
 
 ### 2. Click Analyze
 
-Auto-Cut listens to every track and works out when each person is speaking.
+Wavefield listens to every track and works out when each person is speaking.
 
 The first time you do this on a file it has to read the whole recording, so give
 it a few minutes for an hour-long episode. After that it's quick. Watch the
@@ -68,7 +73,7 @@ see exactly what you're about to lose before committing to it.
 Each person gets their own waveform lane. Click anywhere to jump there, press
 **space** to play.
 
-If Auto-Cut got something wrong, drag across the waveform to select it, then:
+If Wavefield got something wrong, drag across the waveform to select it, then:
 
 | To do this | Press |
 |---|---|
@@ -84,28 +89,71 @@ clatter from whoever is listening.
 
 ### 5. Make it sound better (optional)
 
-Every track has an **FX** button. Auto-Cut comes with free studio effects
-already installed:
+Every track has an **FX** button. Wavefield has six studio effects built in -
+the same ones OBS gives you, with the same settings:
 
 | Effect | What it does |
 |---|---|
-| rnnoise | Removes background hiss, fans, air conditioning |
-| ZamGate | Silences the mic between sentences |
-| ZamComp | Evens out someone who goes loud and quiet |
-| ZamEQ2 | Adjusts tone — more warmth, less boominess |
-| ZamDynamicEQ | Tames harsh "s" sounds |
-| ZaMaximX2 | Stops the loudest moments distorting |
+| Noise Gate | Silences the mic between sentences |
+| Compressor | Evens out someone who goes loud and quiet |
+| Expander | Pushes down quiet background noise without cutting it off |
+| Limiter | Stops the loudest moments distorting |
+| 3-Band EQ | Adjusts tone - more warmth, less boominess |
+| Gain | Makes the whole track louder or quieter |
 
-A good starting order for a voice: **rnnoise → ZamGate → ZamComp → ZamEQ2 →
-ZaMaximX2**.
+It also installs **rnnoise**, which removes background hiss, fans and air
+conditioning. A good starting order for a voice: **rnnoise -> Noise Gate ->
+Compressor -> 3-Band EQ -> Limiter**.
 
-### 6. Export
+Every setting has a box beside its slider, so you can type an exact value
+instead of trying to land on it by dragging.
+
+If you already own other VST3 plugins, they appear in the list underneath and
+work the same way.
+
+### 6. Video podcast? Let it switch cameras for you
+
+If you filmed the interview, Wavefield can cut between cameras on its own -
+whoever is talking is who you see.
+
+You need three recordings that start together and run the same length:
+
+| | |
+|---|---|
+| **V1** | the host, on their own |
+| **V2** | the guest, on their own |
+| **V3** | the shot with both of them in frame |
+
+Add V1 and V2 as your two recordings, then **Vodcast > Set merged video
+(V3)...** and tick **Switch cameras automatically**. V3's sound is ignored - it
+is the same two voices again, and would double every word.
+
+The rules are simple: host talking, you see V1. Guest talking, V2. Both talking
+at once, or nobody, V3.
+
+A **CAMERAS** strip appears under the waveforms with a row per camera. To
+override a stretch, drag along the row of the camera you want - the same drag
+you already use for selecting audio. **Vodcast > Shot length...** sets how long it
+must stay on one camera (so a quick "mm-hm" doesn't cause a jump cut) and how
+long before it cuts away to V3 for variety. **Regenerate camera switching**
+throws your overrides away and starts again from the audio.
+
+Export this with *Finished video (MP4)*. The Resolve timeline can't carry
+camera switching - Resolve rearranges what it is given - so that option greys
+out while switching is on.
+
+### 7. Export
 
 From the **Export** menu:
 
 **Making a video podcast?** Choose *Timeline for DaVinci Resolve*. Then in
 Resolve: `File ▸ Import ▸ Timeline ▸ Import AAF, EDL, XML...` — your cut episode
 appears, ready to colour and add graphics to.
+
+**Want a finished video without opening an editor?** Choose *Finished video
+(MP4)*. Wavefield renders the cut - camera switching included - straight to a
+file you can upload. It uses your graphics card if it can, which is several
+times faster.
 
 **Making an audio podcast?** Choose *Finished audio (WAV)*. Everything is
 already applied — cuts, effects, levels. Upload it and you're done.
@@ -117,7 +165,7 @@ You can add intro and outro music from the same menu.
 ## Saving your work
 
 **File ▸ Save project** keeps your recordings, your edits and your effect
-settings together, so you can come back later. Auto-Cut also saves as you go,
+settings together, so you can come back later. Wavefield also saves as you go,
 and offers to recover everything if it ever crashes.
 
 ---
@@ -125,8 +173,8 @@ and offers to recover everything if it ever crashes.
 ## If something goes wrong
 
 **No sound when I press play**
-Auto-Cut uses whatever speakers Windows is set to. Change it in Windows sound
-settings, then restart Auto-Cut.
+Wavefield uses whatever speakers Windows is set to. Change it in Windows sound
+settings, then restart Wavefield.
 
 **Analyze seems stuck**
 The first pass on a long recording genuinely takes a few minutes. The LOG panel
@@ -138,29 +186,32 @@ DEAD AIR slider left, and it will be less aggressive everywhere.
 
 **It closed by itself**
 An audio effect can occasionally crash the program. There is a file called
-`autocut_crash.log` in the folder where Auto-Cut is installed — sending that
+`autocut_crash.log` in the folder where Wavefield is installed — sending that
 makes it far easier to work out why.
 
 ---
 
-## Transcripts (optional, and fiddly)
+## Transcripts
 
-Auto-Cut can transcribe your episode and write subtitle files alongside your
-export.
+Wavefield transcribes your episode automatically after you press Analyze, and
+can write subtitle files alongside your export. It handles 100 languages,
+including Filipino and Taglish.
 
-**This part is not included in the installer.** The speech recognition engine it
-uses is several gigabytes, and most people don't need it. Setting it up means
-installing Python and running a command — if that sentence means nothing to you,
-ask someone technical to do it once, or simply skip it. Everything else works
-perfectly without it.
+The installer sets this up for you - leave the **"Set up speech recognition"**
+box ticked at the end of setup. It downloads about 2-3 GB and takes 5-15
+minutes, and only ever happens once. If you have an NVIDIA graphics card it
+installs the version that uses it, which is several times faster.
 
-Instructions are in [docs/DEVELOPERS.md](docs/DEVELOPERS.md).
+Skipped it, or lost your connection halfway? Open **File > Settings** and press
+**Install WhisperX** to run the same setup again.
+
+Everything else in Wavefield works without this.
 
 ---
 
 ## Support the podcast
 
-Auto-Cut was built to make [Behind The Science
+Wavefield was built to make [Behind The Science
 Podcast](https://www.facebook.com/btspodcastph) easier to produce, and it's free
 for anyone else to use.
 
@@ -178,7 +229,7 @@ If it saves you time, you can support the show:
 Source, build instructions and the reasoning behind the design:
 [docs/DEVELOPERS.md](docs/DEVELOPERS.md).
 
-Auto-Cut includes GPL-licensed components, so the program as distributed is
+Wavefield includes GPL-licensed components, so the program as distributed is
 covered by the **GNU General Public License version 3**. See
 `THIRD-PARTY-NOTICES.txt`, installed alongside the program, for details and for
 how to request the source code.
