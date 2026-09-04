@@ -6,6 +6,7 @@ actions the new pages hang off.
 """
 
 import os
+import re
 import threading
 import tkinter as tk
 from tkinter import filedialog, messagebox
@@ -236,8 +237,11 @@ class ActionsMixin:
             return
         for segment in segments:
             stamp = self._fmt_time(segment["start"])
+            # One segment is one line, so a newline inside the text would split
+            # it in two and make the transcript disagree with itself.
+            text = " ".join((segment.get("text") or "").split())
             self.transcript_text.insert("end", f"[{stamp}] ", ("stamp",))
-            self.transcript_text.insert("end", segment.get("text", "") + chr(10))
+            self.transcript_text.insert("end", text + chr(10))
 
     def _on_transcript_click(self, event):
         """Double-clicking a line seeks playback to it."""
@@ -255,25 +259,56 @@ class ActionsMixin:
         """
         Reads the editor back into the transcript.
 
-        Timings are matched by line order and never re-derived from the text -
-        edits change words, not when they were said.
+        Lines are matched to segments by the timestamp each one carries, not by
+        their position in the box. Position was brittle: one stray Enter or
+        Backspace shifted every following line by one, and rather than
+        mis-assign the text the app refused the whole edit and told you the
+        line count had changed - which is not something you can act on when you
+        have no idea which line moved.
+
+        Timings are never re-derived from the text. Edits change words, not
+        when they were said.
         """
         segments = (self.transcript or {}).get("segments", [])
         if not segments:
             return
-        lines = self.transcript_text.get("1.0", "end").rstrip("\n").split("\n")
-        if len(lines) != len(segments):
-            messagebox.showwarning(
-                "Line count changed",
-                f"The editor has {len(lines)} lines but the transcript has "
-                f"{len(segments)} segments.\n\nEach line maps to one segment, so "
-                "lines can't be added or removed here - edit the words instead.")
-            return
+        lines = self.transcript_text.get("1.0", "end-1c").split(chr(10))
+
+        stamped = re.compile(r"^\s*\[(\d+:\d{2})\]\s?(.*)$")
+        edits = {}
+        current = None
+        cursor = 0          # segments are in time order, so only ever forward
+        unmatched = 0
+        for line in lines:
+            match = stamped.match(line)
+            if match:
+                stamp, text = match.group(1), match.group(2)
+                current = None
+                for index in range(cursor, len(segments)):
+                    if self._fmt_time(segments[index]["start"]) == stamp:
+                        current = index
+                        cursor = index + 1
+                        break
+                if current is None:
+                    unmatched += 1      # a stamp that is not in this transcript
+                    continue
+                edits[current] = text.strip()
+            elif current is not None and line.strip():
+                # A line split off the one above it - still the same segment,
+                # because only a stamp starts a new one.
+                edits[current] = (edits.get(current, "") + " " + line.strip()).strip()
 
         changed = 0
-        for segment, line in zip(segments, lines):
-            text = line.split("] ", 1)[-1].strip() if line.startswith("[") else line.strip()
-            if text != segment.get("text", ""):
-                segment["text"] = text
+        for index, text in edits.items():
+            if text != (segments[index].get("text") or "").strip():
+                segments[index]["text"] = text
                 changed += 1
-        self.log(f"Applied {changed} transcript edit(s).")
+
+        untouched = len(segments) - len(edits)
+        note = f"Applied {changed} transcript edit(s)."
+        if untouched:
+            note += (f" {untouched} segment(s) had no matching line and were "
+                     f"left as they were.")
+        if unmatched:
+            note += f" {unmatched} line(s) had a timestamp not in the transcript."
+        self.log(note)

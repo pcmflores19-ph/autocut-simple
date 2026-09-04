@@ -429,21 +429,6 @@ class UIBuilderMixin:
                                         command=self.unmute_selection)
         self.unmute_button.grid(row=1, column=1, padx=1, pady=1)
 
-        # Cameras, on the same select-then-act model as the buttons above.
-        # Only useful once a vodcast is set up, so they stay disabled until
-        # switching is on.
-        self.camera_buttons = []
-        camera_grid = ttk.Frame(inspector, style="Panel.TFrame")
-        camera_grid.pack(fill="x", padx=8, pady=(4, 0))
-        for column, (label, camera) in enumerate(
-                (("V1 host (1)", 0), ("V2 guest (2)", 1),
-                 ("V3 both (3)", 2), ("Auto (0)", None))):
-            button = ttk.Button(camera_grid, text=label, width=15,
-                                state="disabled",
-                                command=lambda c=camera: self.set_scene_camera(c))
-            button.grid(row=column // 2, column=column % 2, padx=1, pady=1)
-            self.camera_buttons.append(button)
-
         undo_row = ttk.Frame(inspector, style="Panel.TFrame")
         undo_row.pack(fill="x", padx=8, pady=(4, 0))
         ttk.Button(undo_row, text="Undo (z)", width=15,

@@ -1142,6 +1142,23 @@ class AutoCutApp(UIBuilderMixin, ActionsMixin):
                     outline="#ffffff" if is_forced else "",
                     width=2 if is_forced else 0)
 
+        # The stretch being dragged right now, drawn exactly like a waveform
+        # selection: it is the same gesture, so it should look the same. The
+        # edge lines run the full height of the strip so you can see where the
+        # cut lands on the other cameras, not just the one under the pointer.
+        preview = getattr(self, "_scene_preview", None)
+        if preview:
+            camera, p_start, p_end = preview
+            row_top = top + SCENE_ROW_ORDER.index(camera) * SCENE_ROW_HEIGHT
+            px0 = self._time_to_x(p_start, width, start, span)
+            px1 = self._time_to_x(p_end, width, start, span)
+            self.canvas.create_rectangle(px0, row_top, max(px1, px0 + 1),
+                                         row_top + SCENE_ROW_HEIGHT,
+                                         outline="#8ab4f8", width=2,
+                                         fill="#2a3a52", stipple="gray25")
+            for x in (px0, px1):
+                self.canvas.create_line(x, top, x, bottom, fill="#8ab4f8")
+
     def _scene_row_at(self, y):
         """Which camera the pointer is over in the CAMERAS strip, or None."""
         if not self.scene_switching.get() or not self.scenes:
@@ -1461,10 +1478,6 @@ class AutoCutApp(UIBuilderMixin, ActionsMixin):
         self.restore_button.config(state=state)
         self.mute_button.config(state=state)
         self.unmute_button.config(state=state)
-        # Cameras need a selection AND a vodcast set up.
-        camera_state = state if self.scene_switching.get() else "disabled"
-        for button in getattr(self, "camera_buttons", []):
-            button.config(state=camera_state)
 
         n_cuts = sum(1 for k, _, _ in self.edits if k == "cut")
         n_restores = sum(1 for k, _, _ in self.edits if k == "restore")
