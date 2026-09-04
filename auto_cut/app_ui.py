@@ -44,12 +44,21 @@ class UIBuilderMixin:
         self._build_status_bar()
 
     def _build_menu(self):
-        menubar = tk.Menu(self.root, background=ui_theme.PANEL,
-                          foreground=ui_theme.TEXT, borderwidth=0)
+        """
+        Our own menu bar, not the operating system's.
 
-        file_menu = tk.Menu(menubar, tearoff=0, background=ui_theme.PANEL,
-                            foreground=ui_theme.TEXT,
-                            activebackground=ui_theme.SELECT)
+        Windows draws the real menu bar itself and ignores tk's colours, so the
+        labels sat in system colours above a dark window - and it gave no way
+        to push Support to the right. (The native MFT_RIGHTJUSTIFY flag was
+        tried: the call succeeds, the flag reads back set, and Windows then
+        stops drawing the item at all.) A strip of Menubuttons we own solves
+        the colours, the hover states and the alignment together.
+        """
+        bar = ttk.Frame(self.root, style="Menubar.TFrame")
+        bar.pack(side="top", fill="x")
+        self.menubar_frame = bar
+
+        file_menu = tk.Menu(bar, **ui_theme.menu_options())
         file_menu.add_command(label="New project", command=self.new_project,
                               accelerator="Ctrl+N")
         file_menu.add_command(label="Open project...", command=self.open_project,
@@ -63,15 +72,23 @@ class UIBuilderMixin:
         file_menu.add_command(label="Settings...", command=self.open_settings)
         file_menu.add_separator()
         file_menu.add_command(label="Quit", command=self._on_close)
-        menubar.add_cascade(label="File", menu=file_menu)
-        self._build_export_menu(menubar)
-        self._build_help_menu(menubar)
-        self._build_support_menu(menubar)
+        self._add_menu(bar, "File", file_menu)
 
-        self.root.config(menu=menubar)
+        self._build_export_menu(bar)
+        self._build_help_menu(bar)
+        # Packed to the right, away from the menus you actually work with.
+        self._build_support_menu(bar, side="right")
+
         self.root.bind("<Control-s>", lambda e: self.save_project())
         self.root.bind("<Control-o>", lambda e: self.open_project())
         self.root.bind("<Control-n>", lambda e: self.new_project())
+
+    def _add_menu(self, bar, label, menu, side="left"):
+        """Puts one dropdown on the bar and returns its button."""
+        button = ttk.Menubutton(bar, text=label, menu=menu,
+                                style="Menu.TMenubutton", direction="below")
+        button.pack(side=side)
+        return button
 
     def _labelled_combo(self, parent, label, values, initial, on_change):
         """A caption and a read-only dropdown on their own row."""
@@ -95,9 +112,7 @@ class UIBuilderMixin:
         beside it, so for anyone who did not clone the repository this menu is
         the only documentation there is.
         """
-        menu = tk.Menu(menubar, tearoff=0, background=ui_theme.PANEL,
-                       foreground=ui_theme.TEXT,
-                       activebackground=ui_theme.SELECT)
+        menu = tk.Menu(menubar, **ui_theme.menu_options())
         menu.add_command(label="Quick start",
                          command=lambda: self._show_help(
                              "Quick start", help_text.QUICK_START))
@@ -116,7 +131,7 @@ class UIBuilderMixin:
         menu.add_command(label=f"About {version.APP_NAME}",
                          command=lambda: self._show_help(
                              f"About {version.APP_NAME}", help_text.ABOUT))
-        menubar.add_cascade(label="Help", menu=menu)
+        self._add_menu(menubar, "Help", menu)
 
         self.root.bind("<F1>", lambda e: self._show_help(
             "Keyboard shortcuts", help_text.SHORTCUTS))
@@ -171,11 +186,9 @@ class UIBuilderMixin:
             return
         self._open_url(url)
 
-    def _build_support_menu(self, menubar):
+    def _build_support_menu(self, menubar, side="left"):
         """Where people can find, and support, the podcast behind the app."""
-        menu = tk.Menu(menubar, tearoff=0, background=ui_theme.PANEL,
-                       foreground=ui_theme.TEXT,
-                       activebackground=ui_theme.SELECT)
+        menu = tk.Menu(menubar, **ui_theme.menu_options())
         for label, url in links.SUPPORT_MENU:
             if label is None:
                 menu.add_separator()
@@ -187,7 +200,7 @@ class UIBuilderMixin:
         # will not push it flush against the right edge: MFT_RIGHTJUSTIFY is a
         # legacy flag that themed menu bars no longer honour - setting it
         # succeeds, and the item then stops being drawn at all.
-        menubar.add_cascade(label=f"Support {links.PODCAST_NAME}", menu=menu)
+        self._add_menu(menubar, f"Support {links.PODCAST_NAME}", menu, side)
     def _build_status_bar(self):
         bar = ttk.Frame(self.root, style="Panel.TFrame")
         bar.pack(side="bottom", fill="x")
@@ -541,9 +554,7 @@ class UIBuilderMixin:
         self.intro_path = None
         self.outro_path = None
 
-        menu = tk.Menu(menubar, tearoff=0, background=ui_theme.PANEL,
-                       foreground=ui_theme.TEXT,
-                       activebackground=ui_theme.SELECT)
+        menu = tk.Menu(menubar, **ui_theme.menu_options())
         menu.add_command(label="Timeline for DaVinci Resolve (FCPXML)...",
                          command=self.export_fcpxml)
         menu.add_command(label="Finished audio (WAV)...",
@@ -563,7 +574,7 @@ class UIBuilderMixin:
                          command=lambda: self._choose_bookend("outro"))
         menu.add_command(label="Clear outro",
                          command=lambda: self._clear_bookend("outro"))
-        menubar.add_cascade(label="Export", menu=menu)
+        self._add_menu(menubar, "Export", menu)
 
         # The two export entries are disabled until there is something to
         # export. Indices 0 and 1, kept here so the enable/disable helper does

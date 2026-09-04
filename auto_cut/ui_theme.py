@@ -67,6 +67,17 @@ def apply(root):
                           ("disabled", PANEL)],
               foreground=[("disabled", "#5a5a5a")])
 
+    # The menu bar is our own strip of Menubuttons, not the OS menu bar.
+    # Windows draws its own menu bar and ignores tk's colours entirely, which
+    # left the labels sitting in system colours over a dark window.
+    style.configure("Menubar.TFrame", background=PANEL)
+    style.configure("Menu.TMenubutton", background=PANEL, foreground=TEXT,
+                    borderwidth=0, relief="flat", padding=(10, 4),
+                    arrowsize=0, font=FONT)
+    style.map("Menu.TMenubutton",
+              background=[("active", PANEL_LIGHT), ("pressed", SELECT)],
+              foreground=[("active", "#ffffff"), ("pressed", "#ffffff")])
+
     style.configure("Accent.TButton", background=ACCENT_DIM, foreground="#f0f0f0")
     style.map("Accent.TButton", background=[("active", ACCENT), ("disabled", PANEL)])
 
@@ -118,6 +129,27 @@ def apply(root):
                     font=FONT_SMALL)
 
     return style
+
+
+def menu_options():
+    """
+    Shared options for every dropdown.
+
+    selectcolor is the one that matters: without it the check-mark indicator is
+    drawn in a light default colour with a light glyph on top, so ticks in the
+    Export menu were effectively invisible against the dark pane.
+    """
+    return dict(
+        tearoff=0,
+        background=PANEL,
+        foreground=TEXT,
+        activebackground=SELECT,
+        activeforeground="#ffffff",
+        selectcolor=ACCENT,
+        disabledforeground="#5a5a5a",
+        borderwidth=0,
+        activeborderwidth=0,
+    )
 
 
 def listbox_options():
