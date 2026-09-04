@@ -51,6 +51,29 @@ def have_tool(name):
     return os.path.isabs(path) or shutil.which(path) is not None
 
 
+def file(name):
+    """
+    Full path to a file shipped alongside the application.
+
+    Three places, because one-folder builds put data files in _internal/ while
+    the installer also drops a copy beside the .exe where a person can find it,
+    and neither exists when running from source - where it lives in packaging/.
+    Returns the first that is actually there, or the bundle path so the caller
+    has something to name in an error.
+    """
+    here = os.path.join(_bundle_dir(), name)
+    candidates = [here]
+    if frozen():
+        candidates.append(os.path.join(os.path.dirname(sys.executable), name))
+    else:
+        candidates.append(os.path.join(os.path.dirname(_bundle_dir()),
+                                       "packaging", name))
+    for path in candidates:
+        if os.path.exists(path):
+            return path
+    return here
+
+
 def asset(name):
     """Full path to a file in auto_cut/assets, wherever we are running from."""
     return os.path.join(_bundle_dir(), "assets", name)

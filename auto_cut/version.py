@@ -4,7 +4,7 @@ installer all read it from here so they cannot drift apart."""
 __version__ = "1.0.0"
 
 APP_NAME = "Wavefield"
-PROJECT_URL = "https://github.com/pcmflores19-ph/autocut-simple"
+PROJECT_URL = "https://github.com/pcmflores19-ph/wavefield"
 
 # Wavefield bundles pedalboard and rnnoise, both GPL, so the built application
 # is GPL-3. That obliges us to make the source available to anyone who receives

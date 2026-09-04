@@ -63,6 +63,10 @@ a = Analysis(
         (os.path.join(SPECPATH, "THIRD-PARTY-NOTICES.txt"), "."),
         (os.path.join(SPECPATH, "FFMPEG-LICENSE.txt"), "."),
         (os.path.join(BASE, "LICENSE"), "."),
+        # Installs WhisperX into its own environment. Run by the installer,
+        # and again from File > Settings if it is ever needed a second time -
+        # so it has to travel with the app, not just live in the installer.
+        (os.path.join(SPECPATH, "setup_whisperx.ps1"), "."),
         # The window icon. The `icon=` on EXE below is the shell icon for the
         # .exe file itself and does nothing for the tkinter window.
         (os.path.join(SRC, "assets"), "assets"),

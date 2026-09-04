@@ -10,8 +10,8 @@ Debian/Ubuntu `sudo apt install python3-tk`), and **ffmpeg + ffprobe** on your
 PATH.
 
 ```bash
-git clone https://github.com/pcmflores19-ph/autocut-simple.git
-cd autocut-simple
+git clone https://github.com/pcmflores19-ph/wavefield.git
+cd wavefield
 pip install -r requirements.txt
 python auto_cut/app.py
 ```

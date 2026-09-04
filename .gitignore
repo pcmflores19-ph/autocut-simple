@@ -41,3 +41,7 @@ packaging/output/
 # Plugin binaries fetched at build time, and the source logo.
 packaging/vst3/
 packaging/logo-source.png
+
+# The bundled ffmpeg/ffprobe. Binaries, ~220 MB, and fetched per-machine for
+# the build - never source.
+auto_cut/ffmpeg/

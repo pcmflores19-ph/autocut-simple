@@ -9,6 +9,8 @@ transcription into several hours with no error to explain it.
 
 import os
 import threading
+import subprocess
+import bundled
 import tkinter as tk
 from tkinter import filedialog, ttk
 
@@ -67,9 +69,37 @@ class SettingsDialog(tk.Toplevel):
                    command=self.destroy).pack(side="right", padx=(0, 6))
         ttk.Button(buttons, text="Test", width=12,
                    command=self._test).pack(side="left")
+        ttk.Button(buttons, text="Install WhisperX", width=18,
+                   command=self._install).pack(side="left", padx=(6, 0))
 
         self.bind("<Escape>", lambda e: self.destroy())
         self._describe_current()
+
+    def _install(self):
+        """
+        Runs the same setup the installer offers.
+
+        Here as well as in the installer because the install is the part most
+        likely to need a second go - it wants a few gigabytes and a working
+        network, and someone who skipped the tick box or lost their connection
+        halfway needs a way back that is not "reinstall the whole app".
+        """
+        script = bundled.file("setup_whisperx.ps1")
+        if not script or not os.path.exists(script):
+            self._set_status("setup_whisperx.ps1 is missing from this "
+                             "installation - reinstall Wavefield to restore it.")
+            return
+        try:
+            subprocess.Popen(["powershell.exe", "-NoProfile",
+                              "-ExecutionPolicy", "Bypass", "-File", script],
+                             creationflags=getattr(subprocess,
+                                                   "CREATE_NEW_CONSOLE", 0))
+        except Exception as exc:
+            self._set_status(f"Could not start the installer: {exc}")
+            return
+        self._set_status("Installing WhisperX in the window that just opened. "
+                         "It takes 5-15 minutes. When it finishes, press "
+                         "'Find it for me' here.")
 
     # ---------------------------------------------------------------- helpers
 

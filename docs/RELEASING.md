@@ -8,7 +8,7 @@ that it is four commands and a form.
 **Check the username in `auto_cut/version.py`.**
 
 ```python
-PROJECT_URL = "https://github.com/pcmflores19-ph/autocut-simple"
+PROJECT_URL = "https://github.com/pcmflores19-ph/wavefield"
 ```
 
 This is not decorative. It drives *Help ▸ Project page* and, more importantly,
@@ -24,7 +24,7 @@ On [github.com/new](https://github.com/new):
 
 | Field | Value |
 |---|---|
-| Repository name | `autocut-simple` |
+| Repository name | `wavefield` |
 | Description | Removes dead air from multitrack podcast recordings |
 | Visibility | Public |
 | Initialize with README | **No** |
@@ -38,7 +38,7 @@ push for no benefit.
 ### 2. Push
 
 ```bash
-git remote add origin https://github.com/pcmflores19-ph/autocut-simple.git
+git remote add origin https://github.com/pcmflores19-ph/wavefield.git
 git push -u origin main
 ```
 

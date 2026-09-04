@@ -10,7 +10,7 @@
 #define AppName "Wavefield"
 #define AppExeName "Wavefield.exe"
 #define AppPublisher "Paul Flores"
-#define AppURL "https://github.com/pcmflores19-ph/autocut-simple"
+#define AppURL "https://github.com/pcmflores19-ph/wavefield"
 
 ; Version comes from packaging/build.py as /DAppVersion=..., which reads it
 ; out of auto_cut/version.py. The fallback is only for running ISCC by hand.
@@ -58,8 +58,12 @@ Name: "desktopicon"; Description: "Create a &desktop shortcut"; \
 
 [Files]
 ; The whole PyInstaller one-folder build, ffmpeg included.
-Source: "..\dist\AutoCut\*"; DestDir: "{app}"; \
+Source: "..\dist\Wavefield\*"; DestDir: "{app}"; \
     Flags: ignoreversion recursesubdirs createallsubdirs
+
+; Also beside the .exe, not only in _internal, so the [Run] entry
+; below and the Settings button can both name one obvious path.
+Source: "setup_whisperx.ps1"; DestDir: "{app}"; Flags: ignoreversion
 
 [Icons]
 Name: "{group}\{#AppName}"; Filename: "{app}\{#AppExeName}"
@@ -68,11 +72,24 @@ Name: "{autodesktop}\{#AppName}"; Filename: "{app}\{#AppExeName}"; \
     Tasks: desktopicon
 
 [Run]
+; Speech recognition is a separate install: WhisperX with PyTorch is several
+; gigabytes, and which build is right depends on whether there is an NVIDIA
+; card in the machine. The script works that out, installs into its own
+; environment and writes the path into Wavefield's settings, so nobody has
+; to meet pip. Ticked by default - without it the transcript never appears.
+Filename: "powershell.exe"; \
+    Parameters: "-NoProfile -ExecutionPolicy Bypass -File ""{app}\setup_whisperx.ps1"""; \
+    Description: "Set up speech recognition (downloads about 2-3 GB)"; \
+    Flags: postinstall skipifsilent
+
 Filename: "{app}\{#AppExeName}"; \
     Description: "Start {#AppName}"; \
     Flags: nowait postinstall skipifsilent
 
 [UninstallDelete]
+; The WhisperX environment the setup script builds. Several gigabytes,
+; and useless without the app, so it goes when the app goes.
+Type: filesandordirs; Name: "{localappdata}\Wavefield"
 ; Decoded audio and transcripts the app caches next to itself. Regenerated on
 ; demand, and can run to gigabytes, so leaving it behind would be rude.
 Type: filesandordirs; Name: "{app}\.cache"
