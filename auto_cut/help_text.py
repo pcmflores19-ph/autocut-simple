@@ -6,7 +6,7 @@ it - for anyone who gets a built copy rather than the repository, this is the
 only documentation there is.
 """
 
-from version import APP_NAME, SOURCE_CONTACT_URL, __version__
+from version import APP_NAME, PROJECT_URL, __version__
 
 QUICK_START = """\
 WHAT THIS IS FOR
@@ -182,9 +182,8 @@ Transcription, when enabled, uses WhisperX.
 Bundled effects: rnnoise and ZamPlugins.
 
 This program includes GPL-licensed components, so it is distributed under
-the GNU General Public License version 3. You may obtain the complete
-corresponding source code by messaging
-{SOURCE_CONTACT_URL}
+the GNU General Public License version 3. The complete source code is at
+{PROJECT_URL}
 
 See THIRD-PARTY-NOTICES.txt, installed alongside the program, for the
 licences of everything included.

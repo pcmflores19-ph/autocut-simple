@@ -2,24 +2,16 @@ Auto-Cut bundles third-party software. The components below keep their own
 licences.
 
 ==========================================================================
- WRITTEN OFFER FOR SOURCE CODE
+ SOURCE CODE
 ==========================================================================
 
 This program includes pedalboard, rnnoise and ZamPlugins, which are licensed
 under the GNU General Public License. The application as distributed is
 therefore covered by the GPL version 3.
 
-For a period of three years from the date you received this program, you may
-obtain the complete corresponding source code for it, and for the GPL
-components it contains, by sending a message to:
+The complete corresponding source code is published at:
 
-    Behind The Science Podcast
-    https://www.facebook.com/btspodcastph
-
-The source will be provided at no charge beyond the cost of delivery, on a
-medium customarily used for software interchange, or by download.
-
-This offer is valid for anyone who receives a copy of this program.
+    https://github.com/pcmflores19-ph/autocut-simple
 
 The source for the third-party components is also available directly from
 their own projects, at the addresses given below.
