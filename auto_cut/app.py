@@ -44,12 +44,16 @@ from whisperx_runner import transcribe
 
 LANE_HEIGHT = 74             # per-speaker waveform lane
 RULER_HEIGHT = 18
-SCENE_LANE_HEIGHT = 22       # the camera strip, when a vodcast is set up
+SCENE_ROW_HEIGHT = 20        # one row per camera in the CAMERAS strip
 
-# V1 host, V2 guest, V3 both - distinct enough to read at a glance in a strip
-# only 22px tall.
+# V1 host, V2 guest, V3 both.
 SCENE_COLORS = ("#3a6ea5", "#a5643a", "#4a7c59")
 SCENE_NAMES = ("V1", "V2", "V3")
+
+# Drawn V3 / V2 / V1 top to bottom, matching how the tracks are laid out
+# everywhere else in this project.
+SCENE_ROW_ORDER = (2, 1, 0)
+SCENE_STRIP_HEIGHT = SCENE_ROW_HEIGHT * 3
 MIN_VIEW_SECONDS = 2.0       # deepest zoom
 ZOOM_STEP = 1.4
 
@@ -546,7 +550,7 @@ class AutoCutApp(UIBuilderMixin, ActionsMixin):
         # Grow the canvas to fit one lane per speaker.
         lane_total = RULER_HEIGHT + len(self.peaks_list) * LANE_HEIGHT
         if self.scene_switching.get():
-            lane_total += SCENE_LANE_HEIGHT
+            lane_total += SCENE_STRIP_HEIGHT
         self.canvas.config(height=lane_total)
         self.track_meters.config(height=lane_total)
         self.master_meter.config(height=lane_total)
@@ -671,20 +675,57 @@ class AutoCutApp(UIBuilderMixin, ActionsMixin):
         self._set_export_enabled(bool(self.peaks_list))
         self._draw_waveform()
 
-    def set_min_shot(self):
-        from tkinter import simpledialog
-        value = simpledialog.askfloat(
-            "Minimum shot length",
-            "Shortest time to stay on one camera, in seconds.\n\n"
-            "Without this a brief \"mm-hm\" cuts away and back within a few "
-            "frames, which reads as a glitch.",
-            parent=self.root, initialvalue=self.min_shot_seconds.get(),
-            minvalue=0.0, maxvalue=30.0)
-        if value is None:
-            return
-        self.min_shot_seconds.set(value)
-        self.log(f"Minimum shot length: {value:.1f}s")
-        self.recompute_scenes()
+    def set_shot_lengths(self):
+        """
+        Both ends of how long a shot may run.
+
+        The minimum stops a brief "mm-hm" cutting away and back inside a few
+        frames; the maximum stops one face being held so long the video looks
+        stuck. They are the two ways automatic switching looks wrong.
+        """
+        window = tk.Toplevel(self.root)
+        window.title(f"{version.APP_NAME} - Shot length")
+        window.configure(background=ui_theme.BG)
+        window.transient(self.root)
+        window.resizable(False, False)
+
+        frame = ttk.Frame(window, style="Panel.TFrame")
+        frame.pack(fill="both", expand=True, padx=14, pady=12)
+
+        rows = [
+            ("Minimum", self.min_shot_seconds, 0.0, 10.0,
+             "Shots shorter than this are absorbed into the one before."),
+            ("Maximum", self.max_shot_seconds, 0.0, 120.0,
+             "Longer than this cuts away to V3 briefly. 0 turns it off."),
+        ]
+        for caption, variable, low, high, hint in rows:
+            ttk.Label(frame, text=caption, style="Panel.TLabel").pack(anchor="w")
+            row = ttk.Frame(frame, style="Panel.TFrame")
+            row.pack(fill="x", pady=(2, 0))
+            value = ttk.Label(row, width=8, anchor="e", style="Value.TLabel",
+                              background=ui_theme.BG)
+            scale = ttk.Scale(row, from_=low, to=high, orient="horizontal",
+                              variable=variable, length=320)
+            scale.pack(side="left", fill="x", expand=True)
+            value.pack(side="left", padx=(6, 0))
+
+            def show(_v=None, v=variable, lbl=value):
+                lbl.config(text=f"{v.get():.1f}s")
+            scale.config(command=show)
+            show()
+            ttk.Label(frame, text=hint, style="PanelDim.TLabel",
+                      wraplength=380, justify="left").pack(anchor="w",
+                                                           pady=(0, 8))
+
+        def done():
+            self.log(f"Shot length: {self.min_shot_seconds.get():.1f}s to "
+                     f"{self.max_shot_seconds.get():.1f}s")
+            self.recompute_scenes()
+            window.destroy()
+
+        ttk.Button(frame, text="Done", width=12, style="Accent.TButton",
+                   command=done).pack(anchor="e", pady=(4, 0))
+        window.bind("<Escape>", lambda e: done())
 
     def recompute_scenes(self):
         """The automatic timeline, with hand edits replayed over it."""
@@ -697,9 +738,24 @@ class AutoCutApp(UIBuilderMixin, ActionsMixin):
         active = active_intervals_by_lane(self._speech_levels,
                                           self._speech_hop or 0.01)
         base = scenes_mod.scene_timeline(active, self.timeline_duration,
-                                         self.min_shot_seconds.get())
+                                         self.min_shot_seconds.get(),
+                                         max_shot_seconds=self.max_shot_seconds.get())
         self.scenes = scenes_mod.apply_scene_edits(base, self.scene_edits)
         self._draw_waveform()
+
+    def _record_scene_edit(self, camera, start, end):
+        """
+        Stores one camera assignment as an ordered edit.
+
+        Ordered and replayed rather than written into the timeline, so it
+        survives re-analysis and a moved aggressiveness slider - exactly how
+        cuts and mutes already behave.
+        """
+        self.edit_history.append(("scene", len(self.scene_edits)))
+        self.scene_edits.append(("scene", camera, start, end))
+        names = {0: "V1 host", 1: "V2 guest", 2: "V3 both", None: "automatic"}
+        self.log(f"{start:.2f}-{end:.2f}s -> {names.get(camera, camera)}")
+        self.recompute_scenes()
 
     def set_scene_camera(self, camera):
         """
@@ -711,14 +767,10 @@ class AutoCutApp(UIBuilderMixin, ActionsMixin):
         """
         if not self.scene_switching.get() or self.selection is None:
             return
-        start, end = self.selection
+        start, end = self.selection[0], self.selection[1]
         if end <= start:
             return
-        self.edit_history.append(("scene", len(self.scene_edits)))
-        self.scene_edits.append(("scene", camera, start, end))
-        names = {0: "V1 host", 1: "V2 guest", 2: "V3 both", None: "automatic"}
-        self.log(f"{start:.2f}-{end:.2f}s -> {names.get(camera, camera)}")
-        self.recompute_scenes()
+        self._record_scene_edit(camera, start, end)
 
     def export_segments(self, keep_ranges):
         """
@@ -989,7 +1041,7 @@ class AutoCutApp(UIBuilderMixin, ActionsMixin):
 
         if self.playhead is not None and start <= self.playhead <= start + span:
             x = self._time_to_x(self.playhead, width, start, span)
-            bottom = lanes_bottom + (SCENE_LANE_HEIGHT
+            bottom = lanes_bottom + (SCENE_STRIP_HEIGHT
                                      if self.scene_switching.get() else 0)
             self.canvas.create_line(x, RULER_HEIGHT, x, bottom,
                                     fill="#ffcc44", width=2)
@@ -1001,40 +1053,68 @@ class AutoCutApp(UIBuilderMixin, ActionsMixin):
 
     def _draw_scene_lane(self, width, start, span, top):
         """
-        A strip under the waveforms showing which camera is live.
+        The CAMERAS strip: one row per camera, drawn V3 / V2 / V1 downwards.
 
-        This is the readout that makes switching correctable: at a glance you
-        can see the camera sitting on the wrong person through a laugh, select
-        that stretch, and press 1, 2 or 3.
+        A row per camera rather than a single coloured bar because that is what
+        you edit on - drag along the V2 row and V2 is what you get for that
+        stretch. Reading it is the same gesture as setting it, which a single
+        bar cannot manage.
         """
         if not self.scene_switching.get() or not self.scenes:
             return
 
-        bottom = top + SCENE_LANE_HEIGHT
+        bottom = top + SCENE_STRIP_HEIGHT
         self.canvas.create_rectangle(0, top, width, bottom,
                                      fill=ui_theme.TIMELINE_BG, outline="")
 
-        edited = set()
-        for _kind, _camera, e_start, e_end in self.scene_edits:
-            edited.add((round(e_start, 3), round(e_end, 3)))
+        # Which stretches came from a hand edit, so they can be marked as
+        # deliberate rather than guessed.
+        forced = []
+        for _kind, camera, e_start, e_end in self.scene_edits:
+            if camera is not None:
+                forced.append((camera, e_start, e_end))
 
-        for camera, s_start, s_end in self.scenes:
-            if s_end < start or s_start > start + span:
-                continue
-            x0 = self._time_to_x(s_start, width, start, span)
-            x1 = self._time_to_x(s_end, width, start, span)
-            self.canvas.create_rectangle(
-                x0, top + 2, max(x1, x0 + 1), bottom - 2,
-                fill=SCENE_COLORS[camera], outline=ui_theme.BG)
-            # Only label a block wide enough to read.
-            if x1 - x0 > 26:
-                self.canvas.create_text(
-                    (x0 + x1) / 2, (top + bottom) / 2, fill="#ffffff",
-                    text=SCENE_NAMES[camera], font=ui_theme.FONT_SMALL)
+        for row, camera in enumerate(SCENE_ROW_ORDER):
+            row_top = top + row * SCENE_ROW_HEIGHT
+            row_bottom = row_top + SCENE_ROW_HEIGHT
+            self.canvas.create_line(0, row_bottom, width, row_bottom,
+                                    fill=ui_theme.BG)
+            self.canvas.create_text(4, (row_top + row_bottom) / 2, anchor="w",
+                                    fill=ui_theme.TEXT_DIM,
+                                    text=SCENE_NAMES[camera],
+                                    font=ui_theme.FONT_SMALL)
 
-        self.canvas.create_text(4, top + SCENE_LANE_HEIGHT / 2, anchor="w",
-                                fill=ui_theme.TEXT_DIM, text="CAM",
-                                font=ui_theme.FONT_SMALL)
+            for scene_camera, s_start, s_end in self.scenes:
+                if scene_camera != camera:
+                    continue
+                if s_end < start or s_start > start + span:
+                    continue
+                x0 = self._time_to_x(s_start, width, start, span)
+                x1 = self._time_to_x(s_end, width, start, span)
+                is_forced = any(fc == camera and fs <= s_start and fe >= s_end
+                                for fc, fs, fe in forced)
+                self.canvas.create_rectangle(
+                    max(x0, 24), row_top + 2, max(x1, x0 + 2), row_bottom - 2,
+                    fill=SCENE_COLORS[camera],
+                    outline="#ffffff" if is_forced else "",
+                    width=2 if is_forced else 0)
+
+    def _scene_row_at(self, y):
+        """Which camera the pointer is over in the CAMERAS strip, or None."""
+        if not self.scene_switching.get() or not self.scenes:
+            return None
+        top = self._scene_strip_top()
+        if top is None or not (top <= y < top + SCENE_STRIP_HEIGHT):
+            return None
+        row = int((y - top) // SCENE_ROW_HEIGHT)
+        if 0 <= row < len(SCENE_ROW_ORDER):
+            return SCENE_ROW_ORDER[row]
+        return None
+
+    def _scene_strip_top(self):
+        if not self.peaks_list:
+            return None
+        return RULER_HEIGHT + len(self.peaks_list) * LANE_HEIGHT
 
     def _sync_scrollbar(self, start, span):
         if self.timeline_duration <= 0:
@@ -1101,6 +1181,13 @@ class AutoCutApp(UIBuilderMixin, ActionsMixin):
         if event.state & 0x0001:
             self._pan_anchor = (event.x, self.view_start)
             return
+        # Dragging on the CAMERAS strip assigns that camera directly - the
+        # row you drag along IS the camera you get.
+        camera = self._scene_row_at(event.y)
+        if camera is not None:
+            self._scene_drag = (event.x, self._x_to_time(event.x), camera)
+            return
+
         lane = self._y_to_lane(event.y)
         if lane is None:
             return
@@ -1114,6 +1201,14 @@ class AutoCutApp(UIBuilderMixin, ActionsMixin):
             self.view_start = pan[1] - (event.x - pan[0]) / width * span
             self._draw_waveform()
             return
+        scene_drag = getattr(self, "_scene_drag", None)
+        if scene_drag is not None:
+            anchor_x, anchor_t, camera = scene_drag
+            t = self._x_to_time(event.x)
+            self._scene_preview = (camera, min(anchor_t, t), max(anchor_t, t))
+            self._draw_waveform()
+            return
+
         if self._drag_anchor is None:
             return
         anchor_x, anchor_t, lane = self._drag_anchor
@@ -1128,6 +1223,19 @@ class AutoCutApp(UIBuilderMixin, ActionsMixin):
         if getattr(self, "_pan_anchor", None) is not None:
             self._pan_anchor = None
             return
+        scene_drag = getattr(self, "_scene_drag", None)
+        if scene_drag is not None:
+            anchor_x, anchor_t, camera = scene_drag
+            self._scene_drag = None
+            self._scene_preview = None
+            t = self._x_to_time(event.x)
+            begin, finish = min(anchor_t, t), max(anchor_t, t)
+            if finish - begin < 0.05:
+                self._draw_waveform()       # a stray click, not an edit
+                return
+            self._record_scene_edit(camera, begin, finish)
+            return
+
         if self._drag_anchor is None:
             return
         anchor_x, anchor_t, _lane = self._drag_anchor

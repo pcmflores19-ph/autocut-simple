@@ -116,6 +116,8 @@ def build(app):
                             if hasattr(app, "scene_switching") else False),
         "min_shot_seconds": (float(app.min_shot_seconds.get())
                              if hasattr(app, "min_shot_seconds") else 2.0),
+        "max_shot_seconds": (float(app.max_shot_seconds.get())
+                             if hasattr(app, "max_shot_seconds") else 25.0),
         "scene_edits": [list(e) for e in getattr(app, "scene_edits", [])],
     }
 

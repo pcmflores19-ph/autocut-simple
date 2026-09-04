@@ -27,9 +27,14 @@ HOST, GUEST, BOTH = 0, 1, 2
 # as a glitch rather than an edit.
 DEFAULT_MIN_SHOT_SECONDS = 2.0
 
+# Sitting on one face for minutes on end is the other way switching looks
+# wrong. Past this, cut away to the merged shot briefly and come back - the
+# standard cutaway, and the reason V3 exists. 0 disables it.
+DEFAULT_MAX_SHOT_SECONDS = 25.0
+
 
 def scene_timeline(active_by_lane, duration, min_shot_seconds=None,
-                   hop_seconds=0.01):
+                   hop_seconds=0.01, max_shot_seconds=None):
     """
     [(camera, start, end)] covering 0..duration with no gaps.
 
@@ -38,6 +43,8 @@ def scene_timeline(active_by_lane, duration, min_shot_seconds=None,
     """
     if min_shot_seconds is None:
         min_shot_seconds = DEFAULT_MIN_SHOT_SECONDS
+    if max_shot_seconds is None:
+        max_shot_seconds = DEFAULT_MAX_SHOT_SECONDS
     if duration <= 0:
         return []
 
@@ -67,7 +74,8 @@ def scene_timeline(active_by_lane, duration, min_shot_seconds=None,
             camera = BOTH          # talking together, or nobody talking
         raw.append((camera, a, b))
 
-    return _enforce_minimum(_merge_runs(raw), min_shot_seconds)
+    scenes = _enforce_minimum(_merge_runs(raw), min_shot_seconds)
+    return _enforce_maximum(scenes, max_shot_seconds, min_shot_seconds)
 
 
 def _covers(intervals, moment):
@@ -114,6 +122,39 @@ def _enforce_minimum(scenes, min_shot_seconds):
             break
         else:
             return scenes
+
+
+def _enforce_maximum(scenes, max_shot_seconds, min_shot_seconds):
+    """
+    Breaks up any shot that outstays its welcome with a cutaway to V3.
+
+    A single camera held for minutes reads as a stuck stream. The cutaway goes
+    to the merged shot because both people are in it - it is always a truthful
+    thing to cut to, whoever happens to be talking.
+
+    Shots already on V3 are left alone: there is nowhere more neutral to go.
+    """
+    if not max_shot_seconds or max_shot_seconds <= 0:
+        return scenes
+
+    cutaway = max(1.0, min_shot_seconds)
+    out = []
+    for camera, start, end in scenes:
+        if camera == BOTH or (end - start) <= max_shot_seconds:
+            out.append((camera, start, end))
+            continue
+        position = start
+        while (end - position) > max_shot_seconds:
+            out.append((camera, position, position + max_shot_seconds))
+            position += max_shot_seconds
+            # Never leave a stub shorter than the cutaway itself.
+            if (end - position) < cutaway * 2:
+                break
+            out.append((BOTH, position, position + cutaway))
+            position += cutaway
+        if end > position:
+            out.append((camera, position, end))
+    return _merge_runs(out)
 
 
 # ------------------------------------------------------------- hand editing

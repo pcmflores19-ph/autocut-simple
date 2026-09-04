@@ -555,6 +555,7 @@ class UIBuilderMixin:
         """
         self.scene_switching = tk.BooleanVar(value=False)
         self.min_shot_seconds = tk.DoubleVar(value=2.0)
+        self.max_shot_seconds = tk.DoubleVar(value=25.0)
 
         menu = tk.Menu(menubar, **ui_theme.menu_options())
         menu.add_command(label="Set merged video (V3)...",
@@ -566,11 +567,10 @@ class UIBuilderMixin:
                              variable=self.scene_switching,
                              command=self._on_scene_switching_toggle)
         self._switch_entry = menu.index("end")
-        menu.add_command(label="Minimum shot length...",
-                         command=self.set_min_shot)
+        menu.add_command(label="Shot length...", command=self.set_shot_lengths)
         menu.add_separator()
-        menu.add_command(label="Assign camera: select on the waveform, then "
-                               "press 1, 2, 3 or 0", state="disabled")
+        menu.add_command(label="Drag along a row in the CAMERAS strip to set "
+                               "the camera", state="disabled")
         self.vodcast_menu = menu
         self._add_menu(menubar, "Vodcast", menu)
         self._refresh_vodcast_menu()

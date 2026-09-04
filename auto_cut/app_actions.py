@@ -53,6 +53,7 @@ class ActionsMixin:
         self.scenes = []
         self.scene_switching.set(False)
         self.min_shot_seconds.set(2.0)
+        self.max_shot_seconds.set(25.0)
         self._speech_levels = None
         self._speech_hop = None
         self._saved_speech = None
@@ -164,6 +165,7 @@ class ActionsMixin:
 
         self.v3_path = data.get("v3_path")
         self.min_shot_seconds.set(float(data.get("min_shot_seconds", 2.0)))
+        self.max_shot_seconds.set(float(data.get("max_shot_seconds", 25.0)))
         self.scene_edits = [tuple(e) for e in data.get("scene_edits", [])]
         self.scene_switching.set(bool(data.get("scene_switching", False)))
         self._refresh_vodcast_menu()
