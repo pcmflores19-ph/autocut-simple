@@ -13,6 +13,7 @@ from tkinter import messagebox, ttk
 import help_text
 import links
 import ui_theme
+import value_entry
 import version
 from whisperx_runner import (DEFAULT_LANGUAGE, DEFAULT_MODEL, LANGUAGES,
                              MODELS, language_label, model_label)
@@ -366,10 +367,15 @@ class UIBuilderMixin:
         ttk.Label(inspector, text="DEAD AIR", style="PanelDim.TLabel").pack(
             anchor="w", padx=8)
         self.aggressiveness = tk.IntVar(value=50)
-        self.slider = ttk.Scale(inspector, from_=0, to=100, orient="horizontal",
+        aggr_row = ttk.Frame(inspector, style="Panel.TFrame")
+        aggr_row.pack(fill="x", padx=8, pady=(2, 0))
+        self.slider = ttk.Scale(aggr_row, from_=0, to=100, orient="horizontal",
                                 variable=self.aggressiveness,
                                 command=self._on_slider)
-        self.slider.pack(fill="x", padx=8, pady=(2, 0))
+        self.slider.pack(side="left", fill="x", expand=True)
+        value_entry.attach(aggr_row, self.aggressiveness, 0, 100, width=4,
+                           on_commit=lambda _v: self._on_slider(None)
+                           ).pack(side="left", padx=(6, 0))
         self.aggr_label = ttk.Label(inspector, text="", style="Value.TLabel",
                                     background=ui_theme.PANEL)
         self.aggr_label.pack(anchor="w", padx=8)

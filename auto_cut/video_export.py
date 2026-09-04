@@ -14,6 +14,7 @@ would drift by up to several seconds per cut.
 import os
 import re
 import subprocess
+import tempfile
 
 import bundled
 from media_probe import probe
@@ -135,6 +136,43 @@ def _bookend_input(path, seconds, width, height, fps):
              "-i", f"color=black:s={width}x{height}:r={fps}"], "black")
 
 
+_GRAPH_OPTION = None
+
+
+def _graph_option():
+    """
+    How this ffmpeg wants a filter graph read from a file.
+
+    ffmpeg 6.1 introduced a general "-/option file" form and ffmpeg 7.0 removed
+    the old -filter_complex_script, so which one works depends on the build. The
+    installer ships a current ffmpeg, but Settings can point at any copy on the
+    machine, including one older than the split.
+    """
+    global _GRAPH_OPTION
+    if _GRAPH_OPTION is not None:
+        return _GRAPH_OPTION
+    major, minor = 99, 0
+    try:
+        out = subprocess.run([FFMPEG, "-version"], capture_output=True,
+                             text=True, timeout=15).stdout
+        match = re.search(r"ffmpeg version n?(\d+)\.(\d+)", out)
+        if match:
+            major, minor = int(match.group(1)), int(match.group(2))
+    except Exception:
+        pass        # unreadable version: assume current, which the bundle is
+    _GRAPH_OPTION = ("-/filter_complex" if (major, minor) >= (6, 1)
+                     else "-filter_complex_script")
+    return _GRAPH_OPTION
+
+
+def _discard(path):
+    """Removes a scratch file without ever becoming the reason an export failed."""
+    try:
+        os.remove(path)
+    except OSError:
+        pass
+
+
 def render(video_path, audio_path, out_path, keep_ranges, crf=DEFAULT_CRF,
            use_gpu=None, progress=None, should_cancel=None,
            intro_seconds=0.0, outro_seconds=0.0,
@@ -191,14 +229,25 @@ def render(video_path, audio_path, out_path, keep_ranges, crf=DEFAULT_CRF,
     for source in sources:
         source_args += ["-i", source]
 
+    graph = _filter_graph(segments, info.width, info.height,
+                          rate, intro_kind, outro_kind,
+                          source_count=len(sources))
+
+    # The graph carries one trim/scale/pad entry per segment, so a real episode
+    # runs to tens of thousands of characters - well past the 32767 Windows
+    # allows on a command line, which failed as a baffling "filename or
+    # extension is too long". -filter_complex_script reads it from a file
+    # instead, and has no length limit at all.
+    handle, graph_path = tempfile.mkstemp(suffix=".txt", prefix="wavefield_")
+    with os.fdopen(handle, "w", encoding="utf-8") as f:
+        f.write(graph)
+
     cmd = [
         FFMPEG, "-y", "-hide_banner",
         *source_args,
         "-i", audio_path,
         *intro_args, *outro_args,
-        "-filter_complex", _filter_graph(segments, info.width, info.height,
-                                         rate, intro_kind, outro_kind,
-                                         source_count=len(sources)),
+        _graph_option(), graph_path,
         "-map", "[outv]", "-map", f"{len(sources)}:a:0",
         *video_codec,
         "-pix_fmt", "yuv420p",          # anything else will not play everywhere
@@ -211,9 +260,14 @@ def render(video_path, audio_path, out_path, keep_ranges, crf=DEFAULT_CRF,
         progress(0.0, f"encoding with {'GPU' if use_gpu else 'CPU'} "
                       f"({total / 60:.1f} min of video)")
 
-    process = subprocess.Popen(cmd, stdout=subprocess.DEVNULL,
-                               stderr=subprocess.PIPE, text=True,
-                               encoding="utf-8", errors="replace", bufsize=1)
+    try:
+        process = subprocess.Popen(cmd, stdout=subprocess.DEVNULL,
+                                   stderr=subprocess.PIPE, text=True,
+                                   encoding="utf-8", errors="replace",
+                                   bufsize=1)
+    except Exception:
+        _discard(graph_path)
+        raise
     tail = []
     time_pattern = re.compile(r"time=(\d+):(\d+):(\d+\.?\d*)")
     try:
@@ -239,6 +293,7 @@ def render(video_path, audio_path, out_path, keep_ranges, crf=DEFAULT_CRF,
     finally:
         if process.poll() is None:
             process.kill()
+        _discard(graph_path)
 
     if process.returncode != 0:
         message = "".join(tail)

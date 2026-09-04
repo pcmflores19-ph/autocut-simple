@@ -25,6 +25,7 @@ from tkinter import filedialog, messagebox, ttk
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 import ui_theme
+import value_entry
 import version
 import vst_host
 from app_actions import ActionsMixin
@@ -706,17 +707,14 @@ class AutoCutApp(UIBuilderMixin, ActionsMixin):
             ttk.Label(frame, text=caption, style="Panel.TLabel").pack(anchor="w")
             row = ttk.Frame(frame, style="Panel.TFrame")
             row.pack(fill="x", pady=(2, 0))
-            value = ttk.Label(row, width=8, anchor="e", style="Value.TLabel",
-                              background=ui_theme.BG)
             scale = ttk.Scale(row, from_=low, to=high, orient="horizontal",
                               variable=variable, length=320)
             scale.pack(side="left", fill="x", expand=True)
-            value.pack(side="left", padx=(6, 0))
-
-            def show(_v=None, v=variable, lbl=value):
-                lbl.config(text=f"{v.get():.1f}s")
-            scale.config(command=show)
-            show()
+            entry = value_entry.attach(row, variable, low, high, width=6,
+                                       fmt=lambda v: f"{v:.1f}")
+            entry.pack(side="left", padx=(6, 0))
+            ttk.Label(row, text="s", style="PanelDim.TLabel").pack(side="left",
+                                                                   padx=(2, 0))
             ttk.Label(frame, text=hint, style="PanelDim.TLabel",
                       wraplength=380, justify="left").pack(anchor="w",
                                                            pady=(0, 8))
@@ -930,7 +928,9 @@ class AutoCutApp(UIBuilderMixin, ActionsMixin):
     def _update_aggr_label(self):
         value = int(self.aggressiveness.get())
         gap = aggressiveness_to_min_gap(value)
-        self.aggr_label.config(text=f"{value}/100   ->   cuts silence over {gap:.2f}s")
+        # The number itself is in the box beside the slider now, so this says
+        # what the number means rather than repeating it.
+        self.aggr_label.config(text=f"cuts silence over {gap:.2f}s")
         self.aggr_detail.config(
             text=f"Any gap where nobody speaks for longer than {gap:.2f} seconds "
                  "is removed.")
@@ -1864,18 +1864,15 @@ class AutoCutApp(UIBuilderMixin, ActionsMixin):
 
             fader = ttk.Frame(row, style="Panel.TFrame")
             fader.pack(fill="x")
-            value_label = ttk.Label(fader, text="100%", width=5,
-                                    style="PanelDim.TLabel")
-
-            def on_vol(_v, idx=i, var=vol, lbl=value_label):
-                lbl.config(text=f"{int(var.get())}%")
+            def on_vol(_v=None, idx=i, var=vol):
                 self._set_track(idx, gain=var.get() / 100.0)
 
             # 0-300%: quiet remote guests often need well over unity.
             ttk.Scale(fader, from_=0, to=300, orient="horizontal", variable=vol,
                       command=on_vol).pack(side="left", fill="x", expand=True)
-            value_label.pack(side="left", padx=(4, 0))
-            value_label.config(text=f"{int(vol.get())}%")
+            value_entry.attach(fader, vol, 0, 300, on_commit=lambda _v, f=on_vol: f(),
+                               width=4).pack(side="left", padx=(4, 0))
+            ttk.Label(fader, text="%", style="PanelDim.TLabel").pack(side="left")
 
             self._refresh_fx_button(i)
 

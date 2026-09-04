@@ -109,6 +109,15 @@ def apply(root):
     style.configure("TEntry", fieldbackground=PANEL_LIGHT, foreground=TEXT,
                     bordercolor=BORDER, insertcolor=ACCENT, padding=2)
 
+    # The number beside a slider. Same face as a value label so it reads as a
+    # readout, but it is a real entry and takes a typed value.
+    style.configure("Value.TEntry", fieldbackground=PANEL_LIGHT,
+                    foreground=TEXT, bordercolor=BORDER, insertcolor=ACCENT,
+                    padding=1)
+    style.map("Value.TEntry",
+              fieldbackground=[("focus", TIMELINE_BG)],
+              bordercolor=[("focus", ACCENT)])
+
     style.configure("TScale", background=BG, troughcolor=PANEL_LIGHT,
                     bordercolor=BORDER)
     # A slider you can actually see: an accent-coloured handle on a dark

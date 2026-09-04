@@ -14,6 +14,7 @@ import tkinter as tk
 from tkinter import messagebox, ttk
 
 import effects
+import value_entry
 import ui_theme
 from vst_host import discover_plugins, open_editor_subprocess
 
@@ -179,36 +180,20 @@ class FxDialog(tk.Toplevel):
                 row=row, column=0, sticky="w", pady=2)
 
             var = tk.DoubleVar(value=float(slot.params.get(name, default)))
-            entry_var = tk.StringVar(value=f"{var.get():g}")
 
-            def commit(value, s=slot, n=name, v=var, ev=entry_var,
-                       lo=lo, hi=hi):
-                value = max(lo, min(hi, float(value)))
-                s.params[n] = value
-                v.set(value)
-                ev.set(f"{value:g}")
+            def commit(value, s=slot, n=name, lo=lo, hi=hi):
+                s.params[n] = max(lo, min(hi, float(value)))
                 self.on_change()
 
-            def on_slide(_v, v=var, c=commit):
-                c(v.get())
-
-            def on_typed(_e=None, ev=entry_var, c=commit, v=var):
-                # A slider is fine for a rough sweep and hopeless for "-18".
-                try:
-                    c(float(ev.get()))
-                except ValueError:
-                    ev.set(f"{v.get():g}")      # put back what it was
-                return "break"
-
             scale = ttk.Scale(grid, from_=lo, to=hi, orient="horizontal",
-                              variable=var, command=on_slide)
+                              variable=var,
+                              command=lambda _v, v=var, c=commit: c(v.get()))
             scale.grid(row=row, column=1, sticky="ew", padx=8)
 
-            entry = ttk.Entry(grid, textvariable=entry_var, width=7,
-                              justify="right")
+            # A slider is fine for a rough sweep and hopeless for "-18".
+            entry = value_entry.attach(grid, var, lo, hi, on_commit=commit,
+                                       width=7)
             entry.grid(row=row, column=2, sticky="e")
-            entry.bind("<Return>", on_typed)
-            entry.bind("<FocusOut>", on_typed)
 
             ttk.Label(grid, text=unit, width=5,
                       style="PanelDim.TLabel").grid(row=row, column=3,
