@@ -31,6 +31,8 @@ Step "Looking for Python"
 
 # WhisperX needs 3.9-3.12; 3.13 has no PyTorch wheels yet, so a machine with
 # only 3.13 would fail deep inside pip with nothing useful to read.
+$script:seenVersions = @()   # every Python actually found, for the message below
+
 function Find-Python {
     $candidates = @()
     if (Get-Command py -ErrorAction SilentlyContinue) {
@@ -38,7 +40,14 @@ function Find-Python {
             $candidates += ,@("py", @("-$v"))
         }
     }
-    if (Get-Command python -ErrorAction SilentlyContinue) {
+    # Windows ships a "python" command by default even with no Python
+    # installed at all - it is a stub that opens the Microsoft Store. A real
+    # install only shadows that stub if its own folder comes first on PATH,
+    # which is not guaranteed even when the installer's "Add to PATH" box was
+    # ticked. Trusting Get-Command here is exactly the case that made this
+    # script reinstall Python on a machine that already had a working one.
+    $pyCmd = Get-Command python -ErrorAction SilentlyContinue
+    if ($pyCmd -and $pyCmd.Source -notlike "*\WindowsApps\*") {
         $candidates += ,@("python", @())
     }
     foreach ($c in $candidates) {
@@ -47,6 +56,7 @@ function Find-Python {
             if ($LASTEXITCODE -eq 0 -and $out) {
                 $parts = $out.Trim().Split(".")
                 $major = [int]$parts[0]; $minor = [int]$parts[1]
+                $script:seenVersions += "$major.$minor"
                 if ($major -eq 3 -and $minor -ge 9 -and $minor -le 12) {
                     return @{ Exe = $c[0]; Args = $c[1]; Version = $out.Trim() }
                 }
@@ -58,6 +68,12 @@ function Find-Python {
 
 $python = Find-Python
 if (-not $python) {
+    if ($script:seenVersions) {
+        Say ""
+        Say ("  Found Python " + (($script:seenVersions | Select-Object -Unique) -join ", ") +
+             ", but WhisperX needs 3.9-3.12 specifically - installing 3.12" +
+             " alongside it, which will not touch what is already there.")
+    }
     Say ""
     Say "  Python 3.9-3.12 was not found on this computer." -ForegroundColor Yellow
     Say ""
@@ -90,11 +106,34 @@ Say "  Found Python $($python.Version)"
 
 # ------------------------------------------------------------- NVIDIA or not
 Step "Checking for an NVIDIA graphics card"
+
+# nvidia-smi is not reliably on PATH - it depends on which driver package was
+# used, and some OEM/laptop installs leave it out even though the card and
+# driver are both fine. Checking what hardware Windows actually sees is the
+# fallback that cannot be fooled by a PATH problem.
 $hasNvidia = $false
-try {
-    $null = & nvidia-smi 2>$null
-    if ($LASTEXITCODE -eq 0) { $hasNvidia = $true }
-} catch { }
+$nvidiaSmi = Get-Command nvidia-smi -ErrorAction SilentlyContinue
+if (-not $nvidiaSmi) {
+    foreach ($candidate in @(
+        "$env:SystemRoot\System32\nvidia-smi.exe",
+        "$env:ProgramFiles\NVIDIA Corporation\NVSMI\nvidia-smi.exe"
+    )) {
+        if (Test-Path $candidate) { $nvidiaSmi = $candidate; break }
+    }
+}
+if ($nvidiaSmi) {
+    try {
+        $null = & $nvidiaSmi 2>$null
+        if ($LASTEXITCODE -eq 0) { $hasNvidia = $true }
+    } catch { }
+}
+if (-not $hasNvidia) {
+    try {
+        $gpu = Get-CimInstance Win32_VideoController -ErrorAction Stop |
+               Where-Object { $_.Name -match "NVIDIA" }
+        if ($gpu) { $hasNvidia = $true }
+    } catch { }
+}
 if ($hasNvidia) {
     Say "  NVIDIA GPU found - installing the GPU build (transcribes much faster)"
 } else {
@@ -119,10 +158,15 @@ if (-not (Test-Path $venvPy)) { throw "the environment is missing $venvPy" }
 # from PyPI, which on Windows is the CPU build - so a machine with a perfectly
 # good NVIDIA card would silently transcribe on the CPU, several times slower.
 Step "Installing PyTorch (the big one)"
+# --upgrade matters on a rerun: "pip install torch" with no version pin is a
+# no-op once any torch is already installed, even the wrong build for this
+# machine - pip does not know a different --index-url should mean a different
+# wheel. Without it, fixing GPU detection and running this again would not
+# actually replace a CPU torch that got installed by mistake the first time.
 if ($hasNvidia) {
-    & $venvPy -m pip install torch torchaudio --index-url https://download.pytorch.org/whl/cu126
+    & $venvPy -m pip install --upgrade torch torchaudio --index-url https://download.pytorch.org/whl/cu126
 } else {
-    & $venvPy -m pip install torch torchaudio --index-url https://download.pytorch.org/whl/cpu
+    & $venvPy -m pip install --upgrade torch torchaudio --index-url https://download.pytorch.org/whl/cpu
 }
 if ($LASTEXITCODE -ne 0) { throw "PyTorch failed to install" }
 
