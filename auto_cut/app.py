@@ -46,13 +46,17 @@ LANE_HEIGHT = 74             # per-speaker waveform lane
 RULER_HEIGHT = 18
 SCENE_ROW_HEIGHT = 20        # one row per camera in the CAMERAS strip
 
-# V1 host, V2 guest, V3 both.
-SCENE_COLORS = ("#3a6ea5", "#a5643a", "#4a7c59")
+# A camera takes the colour of the waveform it belongs to: V1 is drawn in the
+# same teal as A1, V2 in the same gold as A2. Two different colours for the
+# same speaker is what made the strip hard to read.
+SCENE_COLORS = (ui_theme.LANE_COLORS[0],      # V1 <- A1, host
+                ui_theme.LANE_COLORS[1],      # V2 <- A2, guest
+                "#8f7fc9")                    # V3, both - deliberately neither
 SCENE_NAMES = ("V1", "V2", "V3")
 
-# Drawn V3 / V2 / V1 top to bottom, matching how the tracks are laid out
-# everywhere else in this project.
-SCENE_ROW_ORDER = (2, 1, 0)
+# V1, V2, V3 downwards, so the rows run in the same order as the waveforms
+# above them: A1 over V1, A2 over V2.
+SCENE_ROW_ORDER = (0, 1, 2)
 SCENE_STRIP_HEIGHT = SCENE_ROW_HEIGHT * 3
 MIN_VIEW_SECONDS = 2.0       # deepest zoom
 ZOOM_STEP = 1.4
@@ -727,6 +731,42 @@ class AutoCutApp(UIBuilderMixin, ActionsMixin):
                    command=done).pack(anchor="e", pady=(4, 0))
         window.bind("<Escape>", lambda e: done())
 
+    def regenerate_scenes(self):
+        """
+        Throws away every hand edit and switches the cameras again from
+        scratch.
+
+        Worth having as its own command because hand edits are sticky by
+        design - they survive re-analysis and slider changes, which is right
+        until you have made a mess and want the automatic version back. Asks
+        first, since the edits are work that cannot be recovered.
+        """
+        if not self.scene_switching.get():
+            messagebox.showinfo("Camera switching off",
+                                "Turn on camera switching first.")
+            return
+        if self.scene_edits and not messagebox.askokcancel(
+                "Regenerate camera switching",
+                f"This discards {len(self.scene_edits)} hand-made camera "
+                "change(s) and switches again from the audio." + chr(10) * 2 +
+                "The cuts, mutes and effects are not touched."):
+            return
+        removed = len(self.scene_edits)
+        self.scene_edits.clear()
+        self.edit_history = [e for e in self.edit_history if e[0] != "scene"]
+        self.recompute_scenes()
+        summary = ""
+        if self.scenes:
+            import scenes as scenes_mod
+            counts = scenes_mod.summarize(self.scenes)
+            summary = (f" - {counts['cuts']} cuts, "
+                       f"V1 {counts['host']:.0f}s / "
+                       f"V2 {counts['guest']:.0f}s / "
+                       f"V3 {counts['both']:.0f}s")
+        self.log(f"Camera switching regenerated"
+                 + (f", {removed} hand change(s) discarded" if removed else "")
+                 + summary + ".")
+
     def recompute_scenes(self):
         """The automatic timeline, with hand edits replayed over it."""
         import scenes as scenes_mod
@@ -1079,9 +1119,12 @@ class AutoCutApp(UIBuilderMixin, ActionsMixin):
             row_bottom = row_top + SCENE_ROW_HEIGHT
             self.canvas.create_line(0, row_bottom, width, row_bottom,
                                     fill=ui_theme.BG)
+            # V1 and V2 name the audio track they belong to; V3 has none.
+            label = SCENE_NAMES[camera]
+            if camera < 2:
+                label = f"{label} (A{camera + 1})"
             self.canvas.create_text(4, (row_top + row_bottom) / 2, anchor="w",
-                                    fill=ui_theme.TEXT_DIM,
-                                    text=SCENE_NAMES[camera],
+                                    fill=SCENE_COLORS[camera], text=label,
                                     font=ui_theme.FONT_SMALL)
 
             for scene_camera, s_start, s_end in self.scenes:

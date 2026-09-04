@@ -568,6 +568,8 @@ class UIBuilderMixin:
                              command=self._on_scene_switching_toggle)
         self._switch_entry = menu.index("end")
         menu.add_command(label="Shot length...", command=self.set_shot_lengths)
+        menu.add_command(label="Regenerate camera switching",
+                         command=self.regenerate_scenes)
         menu.add_separator()
         menu.add_command(label="Drag along a row in the CAMERAS strip to set "
                                "the camera", state="disabled")
