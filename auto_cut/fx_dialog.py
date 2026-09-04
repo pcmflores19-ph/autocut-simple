@@ -41,7 +41,9 @@ class FxDialog(tk.Toplevel):
     def _scrolled_listbox(parent, **kwargs):
         """Listbox with vertical and horizontal scrollbars that always show."""
         wrap = ttk.Frame(parent)
-        wrap.pack(fill="both", expand=True, padx=8, pady=8)
+        # No padding: any gap here shows the darker window colour
+        # around the list and reads as a heavy border.
+        wrap.pack(fill="both", expand=True)
         vsb = ttk.Scrollbar(wrap, orient="vertical")
         hsb = ttk.Scrollbar(wrap, orient="horizontal")
         options = dict(ui_theme.listbox_options())
@@ -66,7 +68,7 @@ class FxDialog(tk.Toplevel):
         self.columnconfigure(0, weight=1)
 
         top = ttk.Frame(self)
-        top.grid(row=0, column=0, sticky="nsew", padx=10, pady=10)
+        top.grid(row=0, column=0, sticky="nsew", padx=6, pady=(6, 0))
         top.rowconfigure(0, weight=1)
         top.columnconfigure(0, weight=1)
         top.columnconfigure(1, weight=1)
@@ -74,13 +76,14 @@ class FxDialog(tk.Toplevel):
         # Built-in effects and VST3 plugins get a box each. Tagging one list
         # with "(VST3)" on every row was noise - the split says it once.
         left = ttk.Frame(top)
-        left.grid(row=0, column=0, sticky="nsew", padx=(0, 5))
+        left.grid(row=0, column=0, sticky="nsew", padx=(0, 2))
         left.rowconfigure(0, weight=0)
         left.rowconfigure(1, weight=1)
         left.columnconfigure(0, weight=1)
 
-        builtin_frame = ttk.LabelFrame(left, text="Effects")
-        builtin_frame.grid(row=0, column=0, sticky="nsew", pady=(0, 6))
+        builtin_frame = ttk.LabelFrame(left, text="Effects",
+                                       style="Flush.TLabelframe")
+        builtin_frame.grid(row=0, column=0, sticky="nsew", pady=(0, 2))
         self.builtin_list = self._scrolled_listbox(
             builtin_frame, height=len(effects.EFFECTS))
         for _key, label, _fn, _params in effects.EFFECTS:
@@ -90,10 +93,11 @@ class FxDialog(tk.Toplevel):
             "<<ListboxSelect>>",
             lambda e: self.vst_list.selection_clear(0, "end"))
         ttk.Button(builtin_frame, text="Add to chain  ->",
-                   command=self._add_builtin).pack(padx=8, pady=(0, 8))
+                   command=self._add_builtin).pack(padx=2, pady=(3, 2))
 
         vst_frame = ttk.LabelFrame(
-            left, text=f"VST3 plugins ({len(self.available)} found)")
+            left, text=f"VST3 plugins ({len(self.available)} found)",
+            style="Flush.TLabelframe")
         vst_frame.grid(row=1, column=0, sticky="nsew")
         self.vst_list = self._scrolled_listbox(vst_frame, height=6)
         for name, _path in self.available:
@@ -103,17 +107,18 @@ class FxDialog(tk.Toplevel):
             "<<ListboxSelect>>",
             lambda e: self.builtin_list.selection_clear(0, "end"))
         ttk.Button(vst_frame, text="Add to chain  ->",
-                   command=self._add_vst).pack(padx=8, pady=(0, 8))
+                   command=self._add_vst).pack(padx=2, pady=(3, 2))
 
         # Chain (right)
-        chain_frame = ttk.LabelFrame(top, text="Chain (signal flows top to bottom)")
-        chain_frame.grid(row=0, column=1, sticky="nsew", padx=(5, 0))
+        chain_frame = ttk.LabelFrame(top, text="Chain (signal flows top to bottom)",
+                                     style="Flush.TLabelframe")
+        chain_frame.grid(row=0, column=1, sticky="nsew", padx=(2, 0))
 
         self.chain_list = self._scrolled_listbox(chain_frame, height=10)
         self.chain_list.bind("<Double-Button-1>", lambda e: self._open_editor())
 
         chain_buttons = ttk.Frame(chain_frame)
-        chain_buttons.pack(fill="x", padx=8, pady=(0, 4))
+        chain_buttons.pack(fill="x", padx=2, pady=(3, 2))
         ttk.Button(chain_buttons, text="Up", width=5,
                    command=lambda: self._move(-1)).pack(side="left")
         ttk.Button(chain_buttons, text="Down", width=6,
@@ -126,16 +131,17 @@ class FxDialog(tk.Toplevel):
         self.chain_enabled = tk.BooleanVar(value=self.chain.enabled)
         ttk.Checkbutton(chain_frame, text="Chain active on this track",
                         variable=self.chain_enabled,
-                        command=self._toggle_chain).pack(anchor="w", padx=8, pady=(0, 8))
+                        command=self._toggle_chain).pack(anchor="w", padx=2, pady=(0, 2))
 
         # Sliders for whichever built-in effect is selected. Empty for a VST3,
         # which has its own window instead.
-        self.params_frame = ttk.LabelFrame(self, text="Settings")
-        self.params_frame.grid(row=1, column=0, sticky="ew", padx=10, pady=(0, 6))
+        self.params_frame = ttk.LabelFrame(self, text="Settings",
+                                           style="Flush.TLabelframe")
+        self.params_frame.grid(row=1, column=0, sticky="ew", padx=6, pady=(4, 0))
         self.chain_list.bind("<<ListboxSelect>>", lambda e: self._show_params())
 
         bottom = ttk.Frame(self)
-        bottom.grid(row=2, column=0, sticky="ew", padx=10, pady=(0, 10))
+        bottom.grid(row=2, column=0, sticky="ew", padx=6, pady=(4, 6))
         ttk.Button(bottom, text="Open plugin GUI",
                    command=self._open_editor).pack(side="left")
         ttk.Label(bottom,
@@ -159,12 +165,12 @@ class FxDialog(tk.Toplevel):
             ttk.Label(self.params_frame,
                       text="Select an effect to change its settings. "
                            "VST3 plugins open their own window.",
-                      style="PanelDim.TLabel").pack(anchor="w", padx=8, pady=6)
+                      style="PanelDim.TLabel").pack(anchor="w", padx=2, pady=4)
             return
 
         _label, _fn, spec = effects.BY_KEY[slot.key]
         grid = ttk.Frame(self.params_frame, style="Panel.TFrame")
-        grid.pack(fill="x", padx=8, pady=6)
+        grid.pack(fill="x", padx=2, pady=4)
         grid.columnconfigure(1, weight=1)
 
         for row, (name, caption, lo, hi, default, unit) in enumerate(spec):

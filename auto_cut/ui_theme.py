@@ -62,6 +62,14 @@ def apply(root):
     style.configure("TLabelframe", background=BG, bordercolor=BG,
                     lightcolor=BG, darkcolor=BG,
                     relief="flat", borderwidth=0)
+    # A group whose background matches the panel inside it - otherwise the
+    # darker window colour shows as a margin around every list and reads as a
+    # thick border, which is what it looked like.
+    style.configure("Flush.TLabelframe", background=PANEL, bordercolor=PANEL,
+                    lightcolor=PANEL, darkcolor=PANEL,
+                    relief="flat", borderwidth=0)
+    style.configure("Flush.TLabelframe.Label", background=PANEL,
+                    foreground=TEXT_DIM, font=FONT_SMALL)
     style.configure("TLabelframe.Label", background=BG, foreground=TEXT_DIM,
                     font=FONT_SMALL)
 
