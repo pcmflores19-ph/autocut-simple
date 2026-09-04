@@ -60,6 +60,8 @@ class UIBuilderMixin:
         file_menu.add_command(label="Save project as...",
                               command=self.save_project_as)
         file_menu.add_separator()
+        file_menu.add_command(label="Settings...", command=self.open_settings)
+        file_menu.add_separator()
         file_menu.add_command(label="Quit", command=self._on_close)
         menubar.add_cascade(label="File", menu=file_menu)
         self._build_export_menu(menubar)
@@ -82,6 +84,10 @@ class UIBuilderMixin:
         box.bind("<<ComboboxSelected>>", lambda e: on_change(box.get()))
         box.pack(side="left", fill="x", expand=True)
         return box
+
+    def open_settings(self):
+        from settings_dialog import SettingsDialog
+        SettingsDialog(self.root, log=self.log)
 
     def _build_help_menu(self, menubar):
         """

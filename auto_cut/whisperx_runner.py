@@ -20,26 +20,120 @@ import tempfile
 
 NL = chr(10)
 
-def whisperx_executable():
+def _candidate_executables():
     """
-    Finds WhisperX: $AUTOCUT_WHISPERX first, otherwise whatever is on PATH.
+    Every WhisperX worth considering, best guess first.
 
-    This used to be one hardcoded path into the author's virtualenv, which
-    meant transcription could not work on anybody else's machine.
+    A saved setting or the environment variable wins outright. After that we
+    look on the PATH and in the usual virtualenv spots, because installing
+    WhisperX into its own venv is the sensible way to do it - and a venv is
+    never on the PATH.
     """
-    override = os.environ.get("AUTOCUT_WHISPERX")
-    if override:
-        return override
-    found = shutil.which("whisperx")
-    if found:
-        return found
-    raise RuntimeError(
-        "WhisperX was not found." + NL + NL +
-        "Install it so that `whisperx` is on your PATH (pip install whisperx), "
-        "or set the AUTOCUT_WHISPERX environment variable to the full path of "
-        "the whisperx executable." + NL + NL +
-        "Transcription is optional - the cuts do not depend on it."
-    )
+    exe = "whisperx.exe" if os.name == "nt" else "whisperx"
+    seen = []
+
+    def add(path):
+        if path and os.path.exists(path) and path not in seen:
+            seen.append(path)
+
+    add(os.environ.get("AUTOCUT_WHISPERX"))
+    try:
+        import settings
+        add(settings.get("whisperx_path"))
+    except Exception:
+        pass
+
+    add(shutil.which("whisperx"))
+
+    # Common places a dedicated environment ends up.
+    home = os.path.expanduser("~")
+    for root in (home, os.path.join(home, "Documents")):
+        for pattern in ("whisperx-env", "whisperx", ".venv", "venv"):
+            for sub in ("Scripts", "bin"):
+                add(os.path.join(root, pattern, sub, exe))
+    return seen
+
+
+def _probe(exe_path):
+    """
+    Asks THIS WhisperX's own interpreter whether its torch can use CUDA.
+
+    The interpreter is what matters, not the machine. A computer can have an
+    NVIDIA card and a WhisperX whose torch is a CPU-only build - which is
+    exactly the case that produced "Torch not compiled with CUDA enabled".
+    Asking nvidia-smi cannot tell the two apart; asking the interpreter can.
+
+    Returns True/False, or None when it could not be determined.
+    """
+    folder = os.path.dirname(exe_path)
+    for name in ("python.exe", "python3", "python"):
+        python = os.path.join(folder, name)
+        if os.path.exists(python):
+            break
+    else:
+        return None
+    try:
+        result = subprocess.run(
+            [python, "-c", "import torch; print(torch.cuda.is_available())"],
+            capture_output=True, text=True, timeout=60,
+        )
+    except Exception:
+        return None
+    if result.returncode != 0:
+        return None
+    return result.stdout.strip().lower().startswith("true")
+
+
+_resolved = None
+
+
+def resolve(force=False):
+    """
+    Returns (executable_path, has_cuda). Worked out once and remembered.
+
+    Where there is a choice, a CUDA-capable install beats a CPU-only one: on a
+    machine with both, picking the wrong one is the difference between eight
+    minutes and several hours.
+    """
+    global _resolved
+    if _resolved is not None and not force:
+        return _resolved
+
+    candidates = _candidate_executables()
+    if not candidates:
+        raise RuntimeError(
+            "WhisperX was not found." + NL + NL +
+            "Install it (pip install whisperx), or point Auto-Cut at it with "
+            "File > Settings if it lives in its own environment." + NL + NL +
+            "Transcription is optional - the cuts do not depend on it."
+        )
+
+    # An explicit choice is honoured even if it turns out to be CPU-only.
+    explicit = os.environ.get("AUTOCUT_WHISPERX")
+    try:
+        import settings
+        explicit = explicit or settings.get("whisperx_path")
+    except Exception:
+        pass
+    if explicit and os.path.exists(explicit):
+        _resolved = (explicit, bool(_probe(explicit)))
+        return _resolved
+
+    fallback = None
+    for path in candidates:
+        has_cuda = _probe(path)
+        if has_cuda:
+            _resolved = (path, True)
+            return _resolved
+        if fallback is None:
+            fallback = (path, bool(has_cuda))
+    _resolved = fallback or (candidates[0], False)
+    return _resolved
+
+
+def whisperx_executable():
+    return resolve()[0]
+
 
 CACHE_DIR = os.path.join(os.path.dirname(__file__), ".cache")
 
@@ -78,20 +172,14 @@ _device_cache = None
 
 def device():
     """
-    "cuda" when an NVIDIA GPU is usable, otherwise "cpu".
+    "cuda" only when the WhisperX we are actually going to run can use it.
 
-    WhisperX defaults to CUDA and simply fails on a machine without it, which
-    is most machines - so the device is now chosen explicitly.
+    This used to ask nvidia-smi, which answers a different question - "does
+    this computer have an NVIDIA card" - and so happily passed --device cuda
+    to a WhisperX whose torch was a CPU-only build. That is an immediate
+    "Torch not compiled with CUDA enabled" and a dead transcription.
 
-    Do NOT decide this by importing torch. WhisperX usually lives in its own
-    virtualenv, so the torch that matters is not the one this process can
-    import: on the development machine (an RTX 3050) `import torch` fails here
-    and would wrongly force everything onto the CPU. Asking the driver via
-    nvidia-smi answers the question that actually matters - is there a usable
-    NVIDIA GPU on this machine - regardless of which environment WhisperX runs
-    in. Set AUTOCUT_DEVICE to override either way.
-
-    Worked out once and remembered; nvidia-smi takes a moment.
+    AUTOCUT_DEVICE overrides either way.
     """
     global _device_cache
     if _device_cache is not None:
@@ -102,21 +190,11 @@ def device():
         _device_cache = forced
         return _device_cache
 
-    _device_cache = "cuda" if _has_nvidia_gpu() else "cpu"
-    return _device_cache
-
-
-def _has_nvidia_gpu():
-    if not shutil.which("nvidia-smi"):
-        return False
     try:
-        result = subprocess.run(
-            ["nvidia-smi", "--query-gpu=name", "--format=csv,noheader"],
-            capture_output=True, text=True, timeout=15,
-        )
+        _device_cache = "cuda" if resolve()[1] else "cpu"
     except Exception:
-        return False
-    return result.returncode == 0 and bool(result.stdout.strip())
+        _device_cache = "cpu"
+    return _device_cache
 
 
 # Never use auto-detect: it was tried, guessed an unrelated language and
