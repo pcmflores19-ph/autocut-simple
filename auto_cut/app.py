@@ -563,6 +563,11 @@ class AutoCutApp(UIBuilderMixin, ActionsMixin):
         self._restore_project_audio_state()
         self._render_transcript()
         self._update_summary()
+        # Scenes are derived from this analysis, so they have to be rebuilt
+        # here. Setting V3 or switching cameras on recomputes them too, but
+        # neither happens when a project is reopened with switching already
+        # saved as on - and then the CAMERAS strip had nothing to draw.
+        self.recompute_scenes()
 
     def _analysis_failed(self, exc):
         self._stop_busy()
