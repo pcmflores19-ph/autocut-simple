@@ -474,7 +474,7 @@ class AutoCutApp(UIBuilderMixin, ActionsMixin):
             self.root.after(0, self._analysis_done)
         except Exception as exc:
             self.log(f"ERROR: {exc}")
-            self.root.after(0, lambda: self._analysis_failed(exc))
+            self.root.after(0, lambda e=exc: self._analysis_failed(e))
 
     # ---------- transcription (separate from the edit) ----------
 
@@ -529,7 +529,7 @@ class AutoCutApp(UIBuilderMixin, ActionsMixin):
             self.root.after(0, self._transcription_done)
         except Exception as exc:
             self.log(f"ERROR: {exc}")
-            self.root.after(0, lambda: self._transcription_failed(exc))
+            self.root.after(0, lambda e=exc: self._transcription_failed(e))
 
     def _transcription_done(self):
         self._stop_busy()
@@ -2022,7 +2022,7 @@ class AutoCutApp(UIBuilderMixin, ActionsMixin):
             self.root.after(0, lambda: self._export_audio_done(written, peak))
         except Exception as exc:
             self.log(f"ERROR exporting audio: {exc}")
-            self.root.after(0, lambda: self._export_audio_failed(exc))
+            self.root.after(0, lambda e=exc: self._export_audio_failed(e))
 
     @staticmethod
     def _format_eta(seconds):
@@ -2169,7 +2169,7 @@ class AutoCutApp(UIBuilderMixin, ActionsMixin):
             self.root.after(0, self._export_video_cancelled)
         except Exception as exc:
             self.log(f"ERROR exporting video: {exc}")
-            self.root.after(0, lambda: self._export_failed(exc))
+            self.root.after(0, lambda e=exc: self._export_failed(e))
         finally:
             if temp_wav and os.path.exists(temp_wav):
                 try:
@@ -2261,7 +2261,7 @@ class AutoCutApp(UIBuilderMixin, ActionsMixin):
             self.root.after(0, lambda: self._export_fcpxml_done(path, extra))
         except Exception as exc:
             self.log(f"ERROR writing FCPXML: {exc}")
-            self.root.after(0, lambda: self._export_failed(exc))
+            self.root.after(0, lambda e=exc: self._export_failed(e))
 
     def _export_fcpxml_done(self, path, extra):
         self._end_modal_export()
