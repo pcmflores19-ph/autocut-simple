@@ -92,5 +92,13 @@ Filename: "{app}\{#AppExeName}"; \
 Type: filesandordirs; Name: "{localappdata}\Wavefield"
 ; Decoded audio and transcripts the app caches next to itself. Regenerated on
 ; demand, and can run to gigabytes, so leaving it behind would be rude.
+;
+; A frozen build writes these beside its own modules, which PyInstaller puts in
+; _internal - not next to the .exe. Both spellings are listed because a build
+; run from source, or a future PyInstaller that drops _internal, would use the
+; other one, and an uninstaller that leaves gigabytes behind is worse than a
+; rule that matches nothing.
+Type: filesandordirs; Name: "{app}\_internal\.cache"
+Type: files; Name: "{app}\_internal\autocut_crash.log"
 Type: filesandordirs; Name: "{app}\.cache"
 Type: files; Name: "{app}\autocut_crash.log"

@@ -144,7 +144,12 @@ if (Test-Path $settings) {
     } catch { }      # a corrupt settings file is not worth failing over
 }
 $data["whisperx_path"] = $whisperx
-$data | ConvertTo-Json | Set-Content $settings -Encoding utf8
+# WriteAllText with an explicit BOM-less encoder, because Set-Content
+# -Encoding utf8 on Windows PowerShell 5.1 writes a BOM and the app reads this
+# file as JSON.
+$json = $data | ConvertTo-Json
+[System.IO.File]::WriteAllText($settings, $json,
+                               (New-Object System.Text.UTF8Encoding($false)))
 Say "  $settings"
 
 # --------------------------------------------------------------------- verify

@@ -48,7 +48,12 @@ def load(force=False):
 
     values = dict(DEFAULTS)
     try:
-        with open(config_path(), "r", encoding="utf-8") as f:
+        # utf-8-sig, not utf-8: the WhisperX setup script writes this file
+        # from PowerShell, and Windows PowerShell 5.1 puts a BOM on everything
+        # it writes. Plain utf-8 chokes on that, and because this whole read is
+        # best-effort the failure is silent - the app would quietly forget
+        # where WhisperX was installed. utf-8-sig reads both.
+        with open(config_path(), "r", encoding="utf-8-sig") as f:
             stored = json.load(f)
         if isinstance(stored, dict):
             # Only keys we know about: an old or hand-edited file should not be
