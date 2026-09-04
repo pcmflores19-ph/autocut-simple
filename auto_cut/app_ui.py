@@ -124,9 +124,11 @@ class UIBuilderMixin:
         menu.add_command(label="Troubleshooting",
                          command=lambda: self._show_help(
                              "Troubleshooting", help_text.TROUBLESHOOTING))
-        # No "Check for updates" or "Project page" while the repository is
-        # private - both would just fail for anyone given the installer.
-        # Restoring them on release day is this block.
+        menu.add_separator()
+        menu.add_command(label="Check for updates",
+                         command=self.check_for_updates)
+        menu.add_command(label="Project page",
+                         command=self._open_project_page)
         menu.add_separator()
         menu.add_command(label=f"About {version.APP_NAME}",
                          command=lambda: self._show_help(
