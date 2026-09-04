@@ -558,22 +558,39 @@ class UIBuilderMixin:
             label="Write the transcript alongside exports (.srt, .vtt, .txt)",
             variable=self.export_transcript)
         menu.add_separator()
-        menu.add_command(label="Set intro audio...",
-                         command=lambda: self._choose_bookend("intro"))
-        menu.add_command(label="Clear intro",
-                         command=lambda: self._clear_bookend("intro"))
-        menu.add_command(label="Set outro audio...",
-                         command=lambda: self._choose_bookend("outro"))
-        menu.add_command(label="Clear outro",
-                         command=lambda: self._clear_bookend("outro"))
+        # Indices are remembered so the labels can show what is currently set
+        # - a menu that never changes gives no way to tell.
+        self._bookend_entries = {}
+        for which in ("intro", "outro"):
+            menu.add_command(
+                label=f"Set {which}...",
+                command=lambda w=which: self._choose_bookend(w))
+            self._bookend_entries[which] = menu.index("end")
+            menu.add_command(label=f"Clear {which}",
+                             command=lambda w=which: self._clear_bookend(w))
         self._add_menu(menubar, "Export", menu)
 
         # The two export entries are disabled until there is something to
         # export. Indices 0 and 1, kept here so the enable/disable helper does
         # not have to know the menu's shape.
         self.export_menu = menu
+        self._refresh_bookend_labels()
         self.export_menu_entries = (0, 1, 2)
         self._set_export_enabled(False)
+
+    def _refresh_bookend_labels(self):
+        """Shows the chosen file beside each bookend entry, with a tick."""
+        import os
+        for which, index in getattr(self, "_bookend_entries", {}).items():
+            path = getattr(self, f"{which}_path", None)
+            if path:
+                label = f"✓  {which.capitalize()}: {os.path.basename(path)}"
+            else:
+                label = f"Set {which}..."
+            try:
+                self.export_menu.entryconfig(index, label=label)
+            except Exception:
+                pass
 
     def _set_export_enabled(self, enabled):
         """

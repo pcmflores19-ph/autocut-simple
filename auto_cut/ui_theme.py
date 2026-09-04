@@ -55,12 +55,13 @@ def apply(root):
     style.configure("Title.TLabel", background=BG, foreground=TEXT, font=FONT_TITLE)
     style.configure("Value.TLabel", background=BG, foreground=ACCENT, font=FONT_BOLD)
 
-    # clam draws a Labelframe's border from lightcolor/darkcolor, NOT from
-    # bordercolor - setting bordercolor alone left thick white boxes on a dark
-    # window however thin the border was asked to be.
-    style.configure("TLabelframe", background=BG, bordercolor=BORDER,
-                    lightcolor=BORDER, darkcolor=BORDER,
-                    relief="solid", borderwidth=1)
+    # No border at all. clam draws a Labelframe's frame from lightcolor and
+    # darkcolor rather than bordercolor, and even matched to the background it
+    # still reads as a heavy box on a dark window. The caption above each
+    # group separates them perfectly well on its own.
+    style.configure("TLabelframe", background=BG, bordercolor=BG,
+                    lightcolor=BG, darkcolor=BG,
+                    relief="flat", borderwidth=0)
     style.configure("TLabelframe.Label", background=BG, foreground=TEXT_DIM,
                     font=FONT_SMALL)
 

@@ -1556,9 +1556,15 @@ class AutoCutApp(UIBuilderMixin, ActionsMixin):
 
     def _choose_bookend(self, which):
         path = filedialog.askopenfilename(
-            title=f"Choose {which} audio",
-            filetypes=[("Audio/video", "*.wav *.mp3 *.m4a *.aac *.flac *.ogg *.mp4 *.mov"),
-                       ("All files", "*.*")],
+            title=f"Choose {which} (audio or video)",
+            filetypes=[
+                # A video bookend keeps its own picture in the video export;
+                # an audio one gets black behind it.
+                ("Audio or video",
+                 "*.wav *.mp3 *.m4a *.aac *.flac *.ogg *.opus "
+                 "*.mp4 *.mov *.mkv *.avi *.webm"),
+                ("All files", "*.*"),
+            ],
         )
         if not path:
             return
@@ -1568,12 +1574,12 @@ class AutoCutApp(UIBuilderMixin, ActionsMixin):
             messagebox.showerror("Could not read file", str(exc))
             return
         setattr(self, f"{which}_path", path)
-        # A menu entry cannot show what is currently chosen, so the log is the
-        # only place this is visible now.
+        self._refresh_bookend_labels()
         self.log(f"{which.capitalize()}: {os.path.basename(path)} ({seconds:.1f}s)")
 
     def _clear_bookend(self, which):
         setattr(self, f"{which}_path", None)
+        self._refresh_bookend_labels()
         self.log(f"{which.capitalize()} cleared.")
 
     def export_audio_file(self):
@@ -1770,7 +1776,8 @@ class AutoCutApp(UIBuilderMixin, ActionsMixin):
                 source, temp_wav, path, keep_ranges,
                 progress=lambda f, m: self._export_step(m, f),
                 should_cancel=self._export_cancelled,
-                intro_seconds=intro_seconds, outro_seconds=outro_seconds)
+                intro_seconds=intro_seconds, outro_seconds=outro_seconds,
+                intro_path=self.intro_path, outro_path=self.outro_path)
 
             if result is None:
                 self.log("Video export cancelled.")

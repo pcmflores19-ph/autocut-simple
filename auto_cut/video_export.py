@@ -56,19 +56,21 @@ def has_nvenc():
     return _nvenc_cache
 
 
-def _filter_graph(keep_ranges, has_intro=False, has_outro=False):
+def _filter_graph(keep_ranges, width, height, fps,
+                  intro_kind=None, outro_kind=None):
     """
     trim/setpts per keep range, concatenated - the standard way to cut a video
     at arbitrary points.
 
-    Only the video is cut here. The audio comes from the WAV Auto-Cut rendered,
-    which is already cut, muted and processed, so re-deriving it here would
-    both duplicate the work and risk the two drifting apart.
+    Only the episode is cut here. The audio comes from the WAV Auto-Cut
+    rendered, which is already cut, muted and processed, so re-deriving it
+    would both duplicate the work and risk the two drifting apart.
 
-    Intro and outro audio need picture to sit against, or the sound would run
-    past the end of the video and everything after would drift. They become
-    black - which is what a podcast intro looks like anyway. The black comes
-    in as extra inputs, indexed after the video and the audio.
+    `intro_kind` / `outro_kind` are None, "black" or "video". Intro and outro
+    audio needs picture to sit against or everything after it drifts; a video
+    bookend supplies its own, and anything else gets black. Either way the
+    bookend is scaled and padded to the episode's exact size and frame rate,
+    because concat refuses inputs that do not match.
     """
     parts = []
     for i, (start, end) in enumerate(keep_ranges):
@@ -76,22 +78,54 @@ def _filter_graph(keep_ranges, has_intro=False, has_outro=False):
             f"[0:v]trim=start={start:.6f}:end={end:.6f},"
             f"setpts=PTS-STARTPTS[v{i}]")
 
+    def conform(source, label):
+        # Letterbox rather than stretch: an intro shot in a different aspect
+        # ratio should keep its shape.
+        return (f"[{source}:v]scale={width}:{height}:force_original_"
+                f"aspect_ratio=decrease,pad={width}:{height}:-1:-1:color=black,"
+                f"fps={fps},setsar=1,format=yuv420p,setpts=PTS-STARTPTS[{label}]")
+
     labels = []
-    next_input = 2                       # 0 is the video, 1 the audio
-    if has_intro:
-        labels.append(f"[{next_input}:v]")
+    next_input = 2                       # 0 is the episode, 1 its audio
+    if intro_kind:
+        parts.append(conform(next_input, "intro"))
+        labels.append("[intro]")
         next_input += 1
     labels += [f"[v{i}]" for i in range(len(keep_ranges))]
-    if has_outro:
-        labels.append(f"[{next_input}:v]")
+    if outro_kind:
+        parts.append(conform(next_input, "outro"))
+        labels.append("[outro]")
 
     parts.append(f"{''.join(labels)}concat=n={len(labels)}:v=1:a=0[outv]")
     return ";".join(parts)
 
 
+def _bookend_input(path, seconds, width, height, fps):
+    """
+    ffmpeg input arguments for one bookend, and what kind it turned out to be.
+
+    A video bookend contributes its own picture; audio-only gets black of the
+    same length.
+    """
+    if seconds <= 0:
+        return [], None
+    if path:
+        try:
+            info = probe(path)
+            if info.has_video:
+                # Trimmed to the audio length so picture and sound agree even
+                # if the file is slightly longer.
+                return (["-t", f"{seconds:.6f}", "-i", path], "video")
+        except Exception:
+            pass                         # unreadable: fall through to black
+    return (["-f", "lavfi", "-t", f"{seconds:.6f}",
+             "-i", f"color=black:s={width}x{height}:r={fps}"], "black")
+
+
 def render(video_path, audio_path, out_path, keep_ranges, crf=DEFAULT_CRF,
            use_gpu=None, progress=None, should_cancel=None,
-           intro_seconds=0.0, outro_seconds=0.0):
+           intro_seconds=0.0, outro_seconds=0.0,
+           intro_path=None, outro_path=None):
     """
     Writes `out_path` from `video_path`'s picture and `audio_path`'s sound.
 
@@ -118,21 +152,21 @@ def render(video_path, audio_path, out_path, keep_ranges, crf=DEFAULT_CRF,
     cpu_codec = ["-c:v", "libx264", "-preset", "medium", "-crf", str(crf)]
     video_codec = gpu_codec if use_gpu else cpu_codec
 
-    size = f"{info.width}x{info.height}"
     rate = f"{float(info.fps):.6f}"
-    black_inputs = []
-    for seconds in (intro_seconds, outro_seconds):
-        if seconds > 0:
-            black_inputs += ["-f", "lavfi", "-t", f"{seconds:.6f}",
-                             "-i", f"color=black:s={size}:r={rate}"]
+    intro_args, intro_kind = _bookend_input(intro_path, intro_seconds,
+                                            info.width, info.height, rate)
+    outro_args, outro_kind = _bookend_input(outro_path, outro_seconds,
+                                            info.width, info.height, rate)
+    if progress and (intro_kind == "video" or outro_kind == "video"):
+        progress(0.0, "using the picture from your intro/outro")
 
     cmd = [
         FFMPEG, "-y", "-hide_banner",
         "-i", video_path,
         "-i", audio_path,
-        *black_inputs,
-        "-filter_complex", _filter_graph(keep_ranges,
-                                         intro_seconds > 0, outro_seconds > 0),
+        *intro_args, *outro_args,
+        "-filter_complex", _filter_graph(keep_ranges, info.width, info.height,
+                                         rate, intro_kind, outro_kind),
         "-map", "[outv]", "-map", "1:a:0",
         *video_codec,
         "-pix_fmt", "yuv420p",          # anything else will not play everywhere
@@ -188,7 +222,8 @@ def render(video_path, audio_path, out_path, keep_ranges, crf=DEFAULT_CRF,
                           crf=crf, use_gpu=False, progress=progress,
                           should_cancel=should_cancel,
                           intro_seconds=intro_seconds,
-                          outro_seconds=outro_seconds)
+                          outro_seconds=outro_seconds,
+                          intro_path=intro_path, outro_path=outro_path)
         raise RuntimeError("ffmpeg could not write the video:" + NL + NL
                            + "".join(tail[-12:]))
     return out_path
