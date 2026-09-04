@@ -141,23 +141,17 @@ DEFAULT_MODEL = "large-v2"
 DEFAULT_BATCH_SIZE = 4
 DEFAULT_COMPUTE_TYPE = "int8"
 
-# Offered in the UI, smallest first. The label carries the trade-off, because
-# the model name alone tells a first-time user nothing - and picking large-v2
-# on a laptop with no NVIDIA card is the single most common way to conclude
-# that the app has hung.
-#
-# The download figure is what WhisperX fetches on first use of each model.
-# English-only (.en) variants are deliberately left out: they are useless for
-# the Taglish this was built for, and doubling the list to explain them would
-# cost more than it gains.
+# Offered in the UI, smallest first. Names as Whisper knows them, with a word
+# only where it changes the choice - the sizes and caveats belong in Help, not
+# in a dropdown you read once.
 MODELS = [
-    ("tiny - fastest, roughest (~75 MB)", "tiny"),
-    ("base - fast, usable (~150 MB)", "base"),
-    ("small - good on a CPU (~500 MB)", "small"),
-    ("medium - slow on a CPU (~1.5 GB)", "medium"),
-    ("large-v3-turbo - near-large, faster (~1.6 GB)", "large-v3-turbo"),
-    ("large-v2 - best, wants a GPU (~3 GB)", "large-v2"),
-    ("large-v3 - newest large (~3 GB)", "large-v3"),
+    ("tiny (fastest)", "tiny"),
+    ("base", "base"),
+    ("small", "small"),
+    ("medium", "medium"),
+    ("large-v3-turbo", "large-v3-turbo"),
+    ("large-v2 (best)", "large-v2"),
+    ("large-v3", "large-v3"),
 ]
 
 

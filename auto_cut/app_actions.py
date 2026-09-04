@@ -144,7 +144,6 @@ class ActionsMixin:
         if model:
             self.whisper_model.set(model)
             self.model_box.set(model_label(model))
-        self._update_analyze_hint()
 
         self._pending_project = data      # chains/tracks restored after analysis
         for attr in ("intro", "outro"):

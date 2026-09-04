@@ -361,14 +361,6 @@ class UIBuilderMixin:
             model_label(DEFAULT_MODEL),
             lambda value: self._on_model_change(value))
 
-        # wraplength, like every other hint in this panel - without it the text
-        # is silently clipped at the edge of the inspector rather than wrapping.
-        self.analyze_hint = ttk.Label(inspector, style="PanelDim.TLabel",
-                                      justify="left",
-                                      wraplength=INSPECTOR_WIDTH - 40)
-        self.analyze_hint.pack(anchor="w", padx=8, pady=(2, 0))
-        self._update_analyze_hint()
-
         ttk.Separator(inspector).pack(fill="x", padx=8, pady=8)
 
         # --- cutting
