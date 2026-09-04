@@ -1586,7 +1586,8 @@ class AutoCutApp(UIBuilderMixin, ActionsMixin):
         self.player.stop()
 
         self._set_export_enabled(False)
-        self._start_busy("Rendering audio")
+        self._begin_modal_export("Exporting audio",
+                                 "Rendering the finished audio...")
         threading.Thread(target=self._export_audio_worker,
                          args=(path, keep_ranges), daemon=True).start()
 
@@ -1603,13 +1604,162 @@ class AutoCutApp(UIBuilderMixin, ActionsMixin):
             written += self._write_transcript_files(path, keep_ranges)
             total = sum(e - s for s, e in keep_ranges)
             self.log(f"Exported {total / 60:.1f} min of audio to {len(written)} file(s).")
+            self._export_step("Finished.", 1.0)
             self.root.after(0, lambda: self._export_audio_done(written, peak))
         except Exception as exc:
             self.log(f"ERROR exporting audio: {exc}")
             self.root.after(0, lambda: self._export_audio_failed(exc))
 
+    # ---------- exports run behind a modal dialog ----------
+
+    def _begin_modal_export(self, title, message):
+        """
+        Puts up the blocking dialog. Editing during a render is what used to
+        crash it - the edit changes the ranges the render is walking through.
+        """
+        from progress_dialog import ProgressDialog
+        self._export_dialog = ProgressDialog(self.root, title=title,
+                                             message=message)
+
+    def _export_step(self, text=None, fraction=None):
+        """Safe to call from a worker thread - hops to the UI thread itself."""
+        dialog = getattr(self, "_export_dialog", None)
+        if dialog is None:
+            return
+        self.root.after(0, lambda: dialog.step(text, fraction))
+
+    def _export_cancelled(self):
+        dialog = getattr(self, "_export_dialog", None)
+        return bool(dialog and dialog.cancelled)
+
+    def _end_modal_export(self):
+        dialog = getattr(self, "_export_dialog", None)
+        self._export_dialog = None
+        if dialog is not None:
+            dialog.close()
+
+    # ---------- video ----------
+
+    def export_video(self):
+        """
+        Renders a finished MP4, for anyone not taking the timeline into
+        Resolve. The audio is the same render the WAV export produces, so the
+        two cannot disagree.
+        """
+        keep_ranges, _ = self._current_keep_ranges()
+        if not keep_ranges:
+            messagebox.showwarning("Nothing to export",
+                                   "No video survived the current settings.")
+            return
+        if not self.speaker_media:
+            messagebox.showwarning("Analyze first",
+                                   "Add recordings and run Analyze first.")
+            return
+
+        # Speaker 0 is the one that becomes V1 in the timeline export; use the
+        # same convention here so the result matches what Resolve would show.
+        source = self.speaker_paths[0]
+        default_name = (os.path.splitext(os.path.basename(source))[0]
+                        + "_autocut.mp4")
+        path = filedialog.asksaveasfilename(
+            title="Save finished video", defaultextension=".mp4",
+            initialfile=default_name,
+            filetypes=[("MP4 video", "*.mp4"), ("All files", "*.*")])
+        if not path:
+            return
+
+        self.player.stop()
+        self._set_export_enabled(False)
+        self._begin_modal_export("Exporting video",
+                                 "Rendering audio, then encoding video...")
+        threading.Thread(target=self._export_video_worker,
+                         args=(path, keep_ranges, source), daemon=True).start()
+
+    def _export_video_worker(self, path, keep_ranges, source):
+        import tempfile
+        import video_export
+        from audio_export import write_wav
+
+        temp_wav = None
+        try:
+            # 1. the audio, exactly as the WAV export makes it
+            self._export_step("Rendering audio...", None)
+            gains = [t.gain for t in self.player.tracks]
+            mix = self._render_mix(keep_ranges, gains)
+            if self._export_cancelled():
+                raise KeyboardInterrupt
+
+            fd, temp_wav = tempfile.mkstemp(prefix="autocut_video_",
+                                            suffix=".wav")
+            os.close(fd)
+            write_wav(temp_wav, mix)
+
+            # 2. the picture, cut to the same ranges
+            self._export_step("Encoding video...", 0.0)
+            result = video_export.render(
+                source, temp_wav, path, keep_ranges,
+                progress=lambda f, m: self._export_step(m, f),
+                should_cancel=self._export_cancelled)
+
+            if result is None:
+                self.log("Video export cancelled.")
+                self.root.after(0, self._export_video_cancelled)
+                return
+
+            extra = self._write_transcript_files(path, keep_ranges)
+            total = sum(e - s for s, e in keep_ranges)
+            self.log(f"Exported {total / 60:.1f} min of video to "
+                     f"{os.path.basename(path)}.")
+            self.root.after(0, lambda: self._export_video_done(path, extra))
+        except KeyboardInterrupt:
+            self.log("Video export cancelled.")
+            self.root.after(0, self._export_video_cancelled)
+        except Exception as exc:
+            self.log(f"ERROR exporting video: {exc}")
+            self.root.after(0, lambda: self._export_failed(exc))
+        finally:
+            if temp_wav and os.path.exists(temp_wav):
+                try:
+                    os.remove(temp_wav)
+                except OSError:
+                    pass
+
+    def _render_mix(self, keep_ranges, gains):
+        """The summed, processed, cut audio - what export_audio writes."""
+        import numpy as np
+        from audio_export import render_track
+
+        rendered = []
+        for i, path in enumerate(self.speaker_paths):
+            self._export_step(f"Rendering {os.path.basename(path)}...", None)
+            track_mutes = [(s, e) for lane, s, e in self.effective_mutes()
+                           if lane == i]
+            chain = self.track_chains[i] if i < len(self.track_chains) else None
+            gain = gains[i] if i < len(gains) else 1.0
+            rendered.append(render_track(path, keep_ranges, track_mutes,
+                                         chain, gain, progress=self.log))
+        length = max(a.size for a in rendered)
+        mix = np.zeros(length, dtype=np.float32)
+        for audio in rendered:
+            mix[:audio.size] += audio
+        peak = float(np.abs(mix).max()) if mix.size else 0.0
+        if peak > 1.0:
+            mix /= peak                 # summing speakers can overshoot
+        return mix
+
+    def _export_video_done(self, path, extra):
+        self._end_modal_export()
+        self._set_export_enabled(True)
+        note = ("\n\nAlso wrote:\n" + "\n".join(os.path.basename(p)
+                                                 for p in extra)) if extra else ""
+        messagebox.showinfo("Exported", f"Saved:\n{path}{note}")
+
+    def _export_video_cancelled(self):
+        self._end_modal_export()
+        self._set_export_enabled(True)
+
     def _export_audio_done(self, written, peak):
-        self._stop_busy()
+        self._end_modal_export()
         self._set_export_enabled(True)
         note = ("\n\nThe mix peaked above full scale and was scaled down "
                 f"({peak:.2f}x) to avoid clipping." if peak > 1.0 else "")
@@ -1641,7 +1791,8 @@ class AutoCutApp(UIBuilderMixin, ActionsMixin):
         self.player.stop()          # see export_audio_file: baking holds the GIL
 
         self._set_export_enabled(False)
-        self._start_busy("Exporting timeline")
+        self._begin_modal_export("Exporting timeline",
+                                 "Writing the Resolve timeline...")
         threading.Thread(target=self._export_fcpxml_worker,
                          args=(path, keep_ranges), daemon=True).start()
 
@@ -1660,7 +1811,7 @@ class AutoCutApp(UIBuilderMixin, ActionsMixin):
             self.root.after(0, lambda: self._export_failed(exc))
 
     def _export_fcpxml_done(self, path, extra):
-        self._stop_busy()
+        self._end_modal_export()
         self._set_export_enabled(True)
         note = ("\n\nTranscript written:\n" + "\n".join(os.path.basename(p)
                                                         for p in extra)) if extra else ""
@@ -1670,7 +1821,7 @@ class AutoCutApp(UIBuilderMixin, ActionsMixin):
             "File > Import > Timeline > Import AAF, EDL, XML..." + note)
 
     def _export_failed(self, exc):
-        self._stop_busy()
+        self._end_modal_export()
         self._set_export_enabled(True)
         messagebox.showerror("Export failed", str(exc))
 

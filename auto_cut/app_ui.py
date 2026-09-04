@@ -551,6 +551,8 @@ class UIBuilderMixin:
                          command=self.export_fcpxml)
         menu.add_command(label="Finished audio (WAV)...",
                          command=self.export_audio_file)
+        menu.add_command(label="Finished video (MP4)...",
+                         command=self.export_video)
         menu.add_separator()
         menu.add_checkbutton(label="Also write one WAV stem per speaker",
                              variable=self.export_stems)
@@ -572,7 +574,7 @@ class UIBuilderMixin:
         # export. Indices 0 and 1, kept here so the enable/disable helper does
         # not have to know the menu's shape.
         self.export_menu = menu
-        self.export_menu_entries = (0, 1)
+        self.export_menu_entries = (0, 1, 2)
         self._set_export_enabled(False)
 
     def _set_export_enabled(self, enabled):
