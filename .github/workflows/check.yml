@@ -23,6 +23,13 @@ jobs:
         with:
           python-version: "3.11"
 
+      # sounddevice's Windows and macOS wheels bundle PortAudio; the Linux
+      # wheel links against the system copy instead, so importing it on a bare
+      # Ubuntu runner fails with "PortAudio library not found".
+      - name: Install PortAudio (Linux only)
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y libportaudio2
+
       - name: Install dependencies
         run: pip install -r requirements.txt
 
