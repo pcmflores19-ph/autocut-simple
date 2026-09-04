@@ -30,11 +30,40 @@ takes 5-15 minutes, once. Everything else works without it, and you can always
 do it later from **File > Settings**.
 
 > **Windows will show a blue warning box** saying *"Windows protected your PC"*.
-> This is normal. It appears for any program whose author hasn't paid Microsoft
-> for a certificate — a few hundred dollars a year, hard to justify for a free
-> tool.
+> This is normal. It appears for any program whose author hasn't paid for a
+> code-signing certificate.
 >
 > To continue: click **More info**, then **Run anyway**.
+
+<details>
+<summary><b>"An Application Control policy has blocked this file"</b> — a different, harder block</summary>
+
+If you get this instead, with **CreateProcess failed; code 4551**, there is no
+"Run anyway" button. Something on that computer is refusing to run *any*
+program without a certificate. There are two possibilities, and they need
+different answers.
+
+Paste this into PowerShell to find out which:
+
+```powershell
+(Get-ItemProperty 'HKLM:\SYSTEM\CurrentControlSet\Control\CI\Policy' -Name VerifiedAndReputablePolicyState -ErrorAction SilentlyContinue).VerifiedAndReputablePolicyState
+```
+
+**If it prints `1`** — that is Windows 11's *Smart App Control*, on by default
+on computers that shipped with Windows 11. You can turn it off in **Windows
+Security ▸ App & browser control ▸ Smart App Control ▸ Off**.
+
+> ⚠️ Read this first: **Smart App Control cannot be turned back on** without
+> reinstalling Windows. Microsoft made it one-way on purpose. Don't disable it
+> on a computer you rely on just to try this app — use a different machine
+> instead.
+
+**If it prints nothing, or `0`** — Smart App Control isn't the cause, so the
+block is coming from a policy your **IT department** set (common on work
+laptops). You cannot switch that off yourself, and shouldn't try. Ask IT to
+allow the app, or use a personal computer.
+
+</details>
 
 Windows only for now. About 100 MB.
 
