@@ -48,6 +48,11 @@ class ActionsMixin:
         # easy to believe they belong to the new one.
         self.per_speaker_words = None
         self.per_speaker_speech = None
+        self.v3_path = None
+        self.scene_edits = []
+        self.scenes = []
+        self.scene_switching.set(False)
+        self.min_shot_seconds.set(2.0)
         self._speech_levels = None
         self._speech_hop = None
         self._saved_speech = None
@@ -156,6 +161,12 @@ class ActionsMixin:
         self._saved_speech = [[tuple(iv) for iv in speech]
                               for speech in data.get("speech", [])] or None
         self.auto_cut_on.set(bool(data.get("auto_cut", True)))
+
+        self.v3_path = data.get("v3_path")
+        self.min_shot_seconds.set(float(data.get("min_shot_seconds", 2.0)))
+        self.scene_edits = [tuple(e) for e in data.get("scene_edits", [])]
+        self.scene_switching.set(bool(data.get("scene_switching", False)))
+        self._refresh_vodcast_menu()
         # Word timings come back with the project, so reopening does not spend
         # minutes re-transcribing audio that has not changed.
         self.per_speaker_words = data.get("words") or None

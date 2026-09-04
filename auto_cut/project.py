@@ -109,6 +109,14 @@ def build(app):
         "framing": getattr(app, "framing", None),
         "auto_cut": bool(app.auto_cut_on.get()) if hasattr(app, "auto_cut_on") else True,
         "words": [list(words) for words in (getattr(app, "per_speaker_words", None) or [])],
+        # Vodcast. scene_edits matter most of these - they are hand work that
+        # re-running analysis cannot recover.
+        "v3_path": getattr(app, "v3_path", None),
+        "scene_switching": (bool(app.scene_switching.get())
+                            if hasattr(app, "scene_switching") else False),
+        "min_shot_seconds": (float(app.min_shot_seconds.get())
+                             if hasattr(app, "min_shot_seconds") else 2.0),
+        "scene_edits": [list(e) for e in getattr(app, "scene_edits", [])],
     }
 
 

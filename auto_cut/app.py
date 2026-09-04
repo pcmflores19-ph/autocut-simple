@@ -44,6 +44,12 @@ from whisperx_runner import transcribe
 
 LANE_HEIGHT = 74             # per-speaker waveform lane
 RULER_HEIGHT = 18
+SCENE_LANE_HEIGHT = 22       # the camera strip, when a vodcast is set up
+
+# V1 host, V2 guest, V3 both - distinct enough to read at a glance in a strip
+# only 22px tall.
+SCENE_COLORS = ("#3a6ea5", "#a5643a", "#4a7c59")
+SCENE_NAMES = ("V1", "V2", "V3")
 MIN_VIEW_SECONDS = 2.0       # deepest zoom
 ZOOM_STEP = 1.4
 
@@ -105,6 +111,14 @@ class AutoCutApp(UIBuilderMixin, ActionsMixin):
         self.transcript = None       # {"segments": [...]} once analysed
         self._pending_project = None
         self.framing = None
+
+        # Vodcast: three recordings of one conversation. V1 and V2 are the
+        # speaker tracks already in speaker_paths; V3 is the merged shot with
+        # both people in frame, and is PICTURE ONLY - its audio is the same two
+        # voices again and would double every word.
+        self.v3_path = None
+        self.scene_edits = []            # ("scene", camera, start, end)
+        self.scenes = []                 # the resolved timeline
         self._peaks_job = None       # debounce for processed-waveform refresh
         self._peaks_busy = False
         self._autosave_job = None
@@ -153,6 +167,12 @@ class AutoCutApp(UIBuilderMixin, ActionsMixin):
             "s": self.unmute_selection,
             "z": self.undo_edit,
             "x": self.clear_edits,
+            # Cameras, when a vodcast is set up. Same selection-then-act model
+            # as the editing keys above.
+            "1": lambda: self.set_scene_camera(0),
+            "2": lambda: self.set_scene_camera(1),
+            "3": lambda: self.set_scene_camera(2),
+            "0": lambda: self.set_scene_camera(None),
         }
         for key, action in shortcuts.items():
             for variant in (key, key.upper()):
@@ -525,6 +545,8 @@ class AutoCutApp(UIBuilderMixin, ActionsMixin):
         self._set_export_enabled(True)
         # Grow the canvas to fit one lane per speaker.
         lane_total = RULER_HEIGHT + len(self.peaks_list) * LANE_HEIGHT
+        if self.scene_switching.get():
+            lane_total += SCENE_LANE_HEIGHT
         self.canvas.config(height=lane_total)
         self.track_meters.config(height=lane_total)
         self.master_meter.config(height=lane_total)
@@ -568,6 +590,146 @@ class AutoCutApp(UIBuilderMixin, ActionsMixin):
                          "or 'base' is the better choice.")
             self._invalidate_analysis()
             break
+
+    # ---------- vodcast: three cameras, one conversation ----------
+
+    def vodcast_problem(self):
+        """
+        Why camera switching cannot be used yet, or None when it can.
+
+        Checked rather than assumed: there is no sync correction anywhere in
+        this app, so a V3 that starts late or runs a different length would
+        drift for the whole episode with nothing to warn you.
+        """
+        if len(self.speaker_paths) != 2:
+            return ("Camera switching needs exactly two speaker recordings "
+                    f"(host and guest). You have {len(self.speaker_paths)}.")
+        if not self.v3_path:
+            return "Set the merged video (V3) first."
+        if not self.speaker_media:
+            return "Run Analyze first."
+        if not all(getattr(m, "has_video", False) for m in self.speaker_media):
+            return ("Both speaker recordings need a picture - audio-only files "
+                    "have nothing to cut between.")
+        try:
+            from media_probe import probe
+            v3 = probe(self.v3_path)
+        except Exception as exc:
+            return f"Could not read the merged video: {exc}"
+        if not v3.has_video:
+            return "The merged video has no picture."
+
+        # Half a second is about a frame and a half at 30fps - tight enough to
+        # catch a genuinely mismatched recording, loose enough to tolerate
+        # container rounding.
+        lengths = [m.duration_seconds for m in self.speaker_media]
+        lengths.append(v3.duration_seconds)
+        if max(lengths) - min(lengths) > 0.5:
+            return (f"The three recordings are different lengths "
+                    f"({', '.join(f'{s:.1f}s' for s in lengths)}). They must "
+                    "start together and run the same length.")
+        return None
+
+    def can_switch_cameras(self):
+        return self.vodcast_problem() is None
+
+    def choose_v3(self):
+        path = filedialog.askopenfilename(
+            title="Choose the merged video (both people in frame)",
+            filetypes=[("Video", "*.mp4 *.mkv *.mov *.avi *.webm"),
+                       ("All files", "*.*")])
+        if not path:
+            return
+        self.v3_path = path
+        self.log(f"Merged video (V3): {os.path.basename(path)}")
+        problem = self.vodcast_problem()
+        if problem:
+            self.log(f"  camera switching not available yet - {problem}")
+        self._refresh_vodcast_menu()
+        self.recompute_scenes()
+
+    def clear_v3(self):
+        self.v3_path = None
+        self.scene_switching.set(False)
+        self.scenes = []
+        self.log("Merged video cleared.")
+        self._refresh_vodcast_menu()
+        self._draw_waveform()
+
+    def _on_scene_switching_toggle(self):
+        if self.scene_switching.get():
+            problem = self.vodcast_problem()
+            if problem:
+                self.scene_switching.set(False)
+                messagebox.showinfo("Camera switching unavailable", problem)
+                return
+            self.recompute_scenes()
+            self.log("Camera switching on.")
+        else:
+            self.log("Camera switching off.")
+        self._refresh_vodcast_menu()
+        self._set_export_enabled(bool(self.peaks_list))
+        self._draw_waveform()
+
+    def set_min_shot(self):
+        from tkinter import simpledialog
+        value = simpledialog.askfloat(
+            "Minimum shot length",
+            "Shortest time to stay on one camera, in seconds.\n\n"
+            "Without this a brief \"mm-hm\" cuts away and back within a few "
+            "frames, which reads as a glitch.",
+            parent=self.root, initialvalue=self.min_shot_seconds.get(),
+            minvalue=0.0, maxvalue=30.0)
+        if value is None:
+            return
+        self.min_shot_seconds.set(value)
+        self.log(f"Minimum shot length: {value:.1f}s")
+        self.recompute_scenes()
+
+    def recompute_scenes(self):
+        """The automatic timeline, with hand edits replayed over it."""
+        import scenes as scenes_mod
+
+        if not self.can_switch_cameras() or not self._speech_levels:
+            self.scenes = []
+            return
+        from silence_detector import active_intervals_by_lane
+        active = active_intervals_by_lane(self._speech_levels,
+                                          self._speech_hop or 0.01)
+        base = scenes_mod.scene_timeline(active, self.timeline_duration,
+                                         self.min_shot_seconds.get())
+        self.scenes = scenes_mod.apply_scene_edits(base, self.scene_edits)
+        self._draw_waveform()
+
+    def set_scene_camera(self, camera):
+        """
+        Puts a camera on the current selection, or back to automatic.
+
+        Recorded as an ordered edit rather than written into the timeline, so
+        it survives re-analysis and a moved aggressiveness slider - exactly how
+        cuts and mutes already behave.
+        """
+        if not self.scene_switching.get() or self.selection is None:
+            return
+        start, end = self.selection
+        if end <= start:
+            return
+        self.edit_history.append(("scene", len(self.scene_edits)))
+        self.scene_edits.append(("scene", camera, start, end))
+        names = {0: "V1 host", 1: "V2 guest", 2: "V3 both", None: "automatic"}
+        self.log(f"{start:.2f}-{end:.2f}s -> {names.get(camera, camera)}")
+        self.recompute_scenes()
+
+    def export_segments(self, keep_ranges):
+        """
+        (segments, sources) for the video export, or (None, None) when
+        switching is off - in which case it is an ordinary one-camera export.
+        """
+        import scenes as scenes_mod
+        if not self.scene_switching.get() or not self.scenes:
+            return None, None
+        sources = [self.speaker_paths[0], self.speaker_paths[1], self.v3_path]
+        return scenes_mod.apply_to_keep_ranges(self.scenes, keep_ranges), sources
 
     # ---------- updates ----------
 
@@ -823,14 +985,56 @@ class AutoCutApp(UIBuilderMixin, ActionsMixin):
             for x in (sx0, sx1):
                 self.canvas.create_line(x, RULER_HEIGHT, x, lanes_bottom, fill="#8ab4f8")
 
+        self._draw_scene_lane(width, start, span, lanes_bottom)
+
         if self.playhead is not None and start <= self.playhead <= start + span:
             x = self._time_to_x(self.playhead, width, start, span)
-            self.canvas.create_line(x, RULER_HEIGHT, x, lanes_bottom, fill="#ffcc44", width=2)
+            bottom = lanes_bottom + (SCENE_LANE_HEIGHT
+                                     if self.scene_switching.get() else 0)
+            self.canvas.create_line(x, RULER_HEIGHT, x, bottom,
+                                    fill="#ffcc44", width=2)
 
         self._sync_scrollbar(start, span)
         self.zoom_label.config(
             text=f"showing {self._fmt_time(start)}-{self._fmt_time(start + span)} "
                  f"of {self._fmt_time(self.timeline_duration)}")
+
+    def _draw_scene_lane(self, width, start, span, top):
+        """
+        A strip under the waveforms showing which camera is live.
+
+        This is the readout that makes switching correctable: at a glance you
+        can see the camera sitting on the wrong person through a laugh, select
+        that stretch, and press 1, 2 or 3.
+        """
+        if not self.scene_switching.get() or not self.scenes:
+            return
+
+        bottom = top + SCENE_LANE_HEIGHT
+        self.canvas.create_rectangle(0, top, width, bottom,
+                                     fill=ui_theme.TIMELINE_BG, outline="")
+
+        edited = set()
+        for _kind, _camera, e_start, e_end in self.scene_edits:
+            edited.add((round(e_start, 3), round(e_end, 3)))
+
+        for camera, s_start, s_end in self.scenes:
+            if s_end < start or s_start > start + span:
+                continue
+            x0 = self._time_to_x(s_start, width, start, span)
+            x1 = self._time_to_x(s_end, width, start, span)
+            self.canvas.create_rectangle(
+                x0, top + 2, max(x1, x0 + 1), bottom - 2,
+                fill=SCENE_COLORS[camera], outline=ui_theme.BG)
+            # Only label a block wide enough to read.
+            if x1 - x0 > 26:
+                self.canvas.create_text(
+                    (x0 + x1) / 2, (top + bottom) / 2, fill="#ffffff",
+                    text=SCENE_NAMES[camera], font=ui_theme.FONT_SMALL)
+
+        self.canvas.create_text(4, top + SCENE_LANE_HEIGHT / 2, anchor="w",
+                                fill=ui_theme.TEXT_DIM, text="CAM",
+                                font=ui_theme.FONT_SMALL)
 
     def _sync_scrollbar(self, start, span):
         if self.timeline_duration <= 0:
@@ -1048,6 +1252,13 @@ class AutoCutApp(UIBuilderMixin, ActionsMixin):
         if not self.edit_history:
             return
         kind, payload = self.edit_history.pop()
+        if kind == "scene":
+            # payload is the index this edit was appended at, so undoing pops
+            # exactly it rather than the last matching one.
+            if payload < len(self.scene_edits):
+                del self.scene_edits[payload]
+            self.recompute_scenes()
+            return
         if kind in ("mute", "unmute"):
             lane, start, end = payload
             entry = (kind, lane, start, end)
@@ -1068,9 +1279,11 @@ class AutoCutApp(UIBuilderMixin, ActionsMixin):
     def clear_edits(self):
         self.edits.clear()
         self.mute_edits.clear()
+        self.scene_edits.clear()
         self.edit_history.clear()
         self.selection = None
         self.log("Cleared all hand edits.")
+        self.recompute_scenes()
         self._apply_edits()
 
     def _apply_edits(self):
@@ -1097,6 +1310,10 @@ class AutoCutApp(UIBuilderMixin, ActionsMixin):
         self.restore_button.config(state=state)
         self.mute_button.config(state=state)
         self.unmute_button.config(state=state)
+        # Cameras need a selection AND a vodcast set up.
+        camera_state = state if self.scene_switching.get() else "disabled"
+        for button in getattr(self, "camera_buttons", []):
+            button.config(state=camera_state)
 
         n_cuts = sum(1 for k, _, _ in self.edits if k == "cut")
         n_restores = sum(1 for k, _, _ in self.edits if k == "restore")
@@ -1773,8 +1990,14 @@ class AutoCutApp(UIBuilderMixin, ActionsMixin):
             # 2. the picture, cut to the same ranges, with black behind the
             #    intro and outro so the sound never runs past the picture.
             self._export_step("Encoding video...", 0.0)
+            segments, sources = self.export_segments(keep_ranges)
+            if segments:
+                self._export_step(
+                    f"Switching between {len(sources)} cameras "
+                    f"({len(segments)} shots)...", 0.0)
             result = video_export.render(
                 source, temp_wav, path, keep_ranges,
+                segments=segments, sources=sources,
                 progress=lambda f, m: self._export_step(m, f),
                 should_cancel=self._export_cancelled,
                 intro_seconds=intro_seconds, outro_seconds=outro_seconds,

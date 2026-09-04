@@ -74,6 +74,7 @@ class UIBuilderMixin:
         file_menu.add_command(label="Quit", command=self._on_close)
         self._add_menu(bar, "File", file_menu)
 
+        self._build_vodcast_menu(bar)
         self._build_export_menu(bar)
         self._build_help_menu(bar)
         # Packed to the right, away from the menus you actually work with.
@@ -422,6 +423,21 @@ class UIBuilderMixin:
                                         command=self.unmute_selection)
         self.unmute_button.grid(row=1, column=1, padx=1, pady=1)
 
+        # Cameras, on the same select-then-act model as the buttons above.
+        # Only useful once a vodcast is set up, so they stay disabled until
+        # switching is on.
+        self.camera_buttons = []
+        camera_grid = ttk.Frame(inspector, style="Panel.TFrame")
+        camera_grid.pack(fill="x", padx=8, pady=(4, 0))
+        for column, (label, camera) in enumerate(
+                (("V1 host (1)", 0), ("V2 guest (2)", 1),
+                 ("V3 both (3)", 2), ("Auto (0)", None))):
+            button = ttk.Button(camera_grid, text=label, width=15,
+                                state="disabled",
+                                command=lambda c=camera: self.set_scene_camera(c))
+            button.grid(row=column // 2, column=column % 2, padx=1, pady=1)
+            self.camera_buttons.append(button)
+
         undo_row = ttk.Frame(inspector, style="Panel.TFrame")
         undo_row.pack(fill="x", padx=8, pady=(4, 0))
         ttk.Button(undo_row, text="Undo (z)", width=15,
@@ -531,6 +547,54 @@ class UIBuilderMixin:
             text="click seek   |   drag select   |   shift-drag pan   |   wheel zoom")
         self.play_hint.pack(side="right")
 
+    def _build_vodcast_menu(self, menubar):
+        """
+        Three recordings of one conversation: V1 host, V2 guest, V3 the merged
+        shot with both in frame. V3 is picture only - its audio is the same two
+        voices again.
+        """
+        self.scene_switching = tk.BooleanVar(value=False)
+        self.min_shot_seconds = tk.DoubleVar(value=2.0)
+
+        menu = tk.Menu(menubar, **ui_theme.menu_options())
+        menu.add_command(label="Set merged video (V3)...",
+                         command=self.choose_v3)
+        self._v3_entry = menu.index("end")
+        menu.add_command(label="Clear merged video", command=self.clear_v3)
+        menu.add_separator()
+        menu.add_checkbutton(label="Switch cameras automatically",
+                             variable=self.scene_switching,
+                             command=self._on_scene_switching_toggle)
+        self._switch_entry = menu.index("end")
+        menu.add_command(label="Minimum shot length...",
+                         command=self.set_min_shot)
+        menu.add_separator()
+        menu.add_command(label="Assign camera: select on the waveform, then "
+                               "press 1, 2, 3 or 0", state="disabled")
+        self.vodcast_menu = menu
+        self._add_menu(menubar, "Vodcast", menu)
+        self._refresh_vodcast_menu()
+
+    def _refresh_vodcast_menu(self):
+        """Keeps the menu honest about what is set and what is possible."""
+        import os
+        menu = getattr(self, "vodcast_menu", None)
+        if menu is None:
+            return
+        if self.v3_path:
+            label = f"✓  V3: {os.path.basename(self.v3_path)}"
+        else:
+            label = "Set merged video (V3)..."
+        try:
+            menu.entryconfig(self._v3_entry, label=label)
+            # Greyed until it could actually work; the reason is shown when
+            # you try, rather than leaving you guessing.
+            ready = self.can_switch_cameras() or self.scene_switching.get()
+            menu.entryconfig(self._switch_entry,
+                             state="normal" if ready else "disabled")
+        except Exception:
+            pass
+
     def _build_export_menu(self, menubar):
         """
         Exporting lives on the menu bar rather than a page of its own.
@@ -605,9 +669,16 @@ class UIBuilderMixin:
                         for m in (self.speaker_media or []))
         # (0) FCPXML timeline, (1) WAV, (2) MP4 - only the WAV works audio-only.
         needs_video = {0, 2}
+        switching = (hasattr(self, "scene_switching")
+                     and self.scene_switching.get())
         for index in self.export_menu_entries:
             allowed = state
             if enabled and index in needs_video and not has_video:
+                allowed = "disabled"
+            # A timeline cannot carry the camera switching: Resolve rearranges
+            # what it is given, which is what sank the first attempt at this.
+            # Video and audio export still work.
+            if index == 0 and switching:
                 allowed = "disabled"
             self.export_menu.entryconfig(index, state=allowed)
 
