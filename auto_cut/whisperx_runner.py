@@ -141,17 +141,18 @@ DEFAULT_MODEL = "large-v2"
 DEFAULT_BATCH_SIZE = 4
 DEFAULT_COMPUTE_TYPE = "int8"
 
-# Offered in the UI, smallest first. Names as Whisper knows them, with a word
-# only where it changes the choice - the sizes and caveats belong in Help, not
-# in a dropdown you read once.
+# Offered in the UI, smallest first, v2 before v3. The VRAM figure is what
+# faster-whisper needs at int8 - the compute type this app uses - so it is the
+# number that decides whether a model will actually run on someone's card.
+# They all run on the processor too, just slowly; that belongs in Help.
 MODELS = [
-    ("tiny (fastest)", "tiny"),
-    ("base", "base"),
-    ("small", "small"),
-    ("medium", "medium"),
-    ("large-v3-turbo", "large-v3-turbo"),
-    ("large-v2 (best)", "large-v2"),
-    ("large-v3", "large-v3"),
+    ("tiny (0.5 GB VRAM)", "tiny"),
+    ("base (0.5 GB VRAM)", "base"),
+    ("small (1 GB VRAM)", "small"),
+    ("medium (2 GB VRAM)", "medium"),
+    ("large-v2 (3 GB VRAM)", "large-v2"),
+    ("large-v3 (3 GB VRAM)", "large-v3"),
+    ("large-v3-turbo (2 GB VRAM)", "large-v3-turbo"),
 ]
 
 

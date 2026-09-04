@@ -171,6 +171,8 @@ def discover_plugins(extra_dirs=None):
 
 
 class PluginSlot:
+    is_native = False
+
     def __init__(self, name, path, plugin):
         self.name = name
         self.path = path
@@ -184,6 +186,38 @@ class PluginSlot:
     def apply_state(self, raw_state):
         with self.lock:
             self.plugin.raw_state = raw_state
+
+
+class NativeSlot:
+    """
+    One of the built-in effects (see effects.py), in the same chain as any VST3.
+
+    Deliberately the same shape as PluginSlot - name, bypassed, lock - so
+    TrackChain does not have to care which kind it is holding. What differs is
+    that this one has no external plugin to load, so it costs nothing to copy
+    and cannot crash the process.
+    """
+
+    is_native = True
+
+    def __init__(self, key, params=None):
+        import effects
+        self.key = key
+        self.name = effects.BY_KEY[key][0]
+        self.path = None
+        self.params = dict(effects.defaults(key))
+        if params:
+            self.params.update(params)
+        self.bypassed = False
+        self.lock = threading.Lock()
+        self.editor_process = None
+
+    def process(self, audio, sample_rate):
+        import effects
+        return effects.apply(self.key, audio, sample_rate, self.params)
+
+    def copy(self):
+        return NativeSlot(self.key, self.params)
 
 
 def _focus_editor_window(pid):
@@ -311,6 +345,12 @@ class TrackChain:
             self.slots.append(PluginSlot(name, path, plugin))
         return self.slots[-1]
 
+    def add_native(self, key, params=None):
+        """Appends a built-in effect. No plugin loading, so no load gate."""
+        with self._lock:
+            self.slots.append(NativeSlot(key, params))
+        return self.slots[-1]
+
     def remove(self, index):
         with self._lock:
             if 0 <= index < len(self.slots):
@@ -352,7 +392,12 @@ class TrackChain:
             for slot in slots:
                 try:
                     with slot.lock:
-                        buf = slot.plugin(buf, sample_rate, reset=reset)
+                        if getattr(slot, "is_native", False):
+                            # Built-in effects work on the plain 1-D signal.
+                            buf = slot.process(
+                                buf.reshape(-1), sample_rate).reshape(1, -1)
+                        else:
+                            buf = slot.plugin(buf, sample_rate, reset=reset)
                 except Exception:
                     continue
         return buf.reshape(-1)
@@ -375,10 +420,18 @@ class TrackChain:
         # Phase 1: read each plugin's state. slot.lock is taken and released
         # here and nowhere near the load lock - holding it while waiting for
         # the load lock would invert the order used by process() and deadlock.
+        copy = TrackChain()
+        copy.enabled = self.enabled
+
         wanted = []
         for slot in list(self.slots):
             if slot.bypassed:
                 continue                      # nothing to reproduce
+            if getattr(slot, "is_native", False):
+                # Nothing to load and nothing shared - just take a copy and
+                # keep its position in the chain.
+                copy.slots.append((len(copy.slots), slot.copy()))
+                continue
             try:
                 with slot.lock:
                     state = slot.plugin.raw_state
@@ -391,8 +444,10 @@ class TrackChain:
         # Phase 2: load the copies. One lock acquisition per plugin rather than
         # one for the whole chain, so a playing audio thread waits for a single
         # load at worst instead of the entire set.
-        copy = TrackChain()
-        copy.enabled = self.enabled
+        # Native slots were appended above as (position, slot) pairs; unwrap
+        # them now that the ordering is settled.
+        copy.slots = [entry[1] if isinstance(entry, tuple) else entry
+                      for entry in copy.slots]
         for name, path, state in wanted:
             try:
                 with _GATE.loading():

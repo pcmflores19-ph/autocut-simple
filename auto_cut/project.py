@@ -26,11 +26,18 @@ def _chain_to_dict(chain):
         return {"enabled": True, "slots": []}
     slots = []
     for slot in chain.slots:
+        if getattr(slot, "is_native", False):
+            # A built-in effect is just a key and some numbers - no plugin
+            # state to serialise, and it can never fail to reload.
+            slots.append({"kind": "native", "key": slot.key,
+                          "name": slot.name, "bypassed": slot.bypassed,
+                          "params": dict(slot.params)})
+            continue
         try:
             raw = base64.b64encode(slot.plugin.raw_state).decode("ascii")
         except Exception:
             raw = None      # plugin can't serialize; it'll load at defaults
-        slots.append({"name": slot.name, "path": slot.path,
+        slots.append({"kind": "vst3", "name": slot.name, "path": slot.path,
                       "bypassed": slot.bypassed, "raw_state": raw})
     return {"enabled": bool(chain.enabled), "slots": slots}
 
@@ -42,6 +49,14 @@ def _chain_from_dict(data, log=None):
     chain = vst_host.TrackChain()
     chain.enabled = bool(data.get("enabled", True))
     for entry in data.get("slots", []):
+        if entry.get("kind") == "native":
+            try:
+                slot = chain.add_native(entry["key"], entry.get("params"))
+                slot.bypassed = bool(entry.get("bypassed"))
+            except Exception as exc:
+                if log:
+                    log(f"Effect skipped: {entry.get('name', '?')} ({exc})")
+            continue
         path, name = entry.get("path"), entry.get("name", "?")
         if not path or not os.path.exists(path):
             if log:

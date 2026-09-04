@@ -37,13 +37,11 @@ rnnoise / noise-suppression-for-voice
   Licence : GNU General Public License version 3
   Source  : https://github.com/werman/noise-suppression-for-voice
 
-ZamPlugins  (ZamGate, ZamComp, ZamEQ2, ZamDynamicEQ, ZaMaximX2, ZamNoise)
-  Licence : GNU General Public License version 2 or later
-  Source  : https://github.com/zamaudio/zam-plugins
+Unmodified binary from the project's own release, loaded at runtime as a
+plugin. The complete corresponding source is at the address above.
 
-Both are unmodified binaries from the projects' own releases, loaded at
-runtime as plugins. The complete corresponding source is at the addresses
-above. Auto-Cut ships a subset of ZamPlugins, not the full set.
+The gate, compressor, expander, limiter, EQ and gain are Auto-Cut's own code
+(auto_cut/effects.py), ported from OBS Studio's filters - not bundled plugins.
 
 No freeware plugins are included. Free of charge is not the same as free to
 redistribute, and the ones used while developing Auto-Cut do not permit it.

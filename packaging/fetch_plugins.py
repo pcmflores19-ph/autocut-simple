@@ -11,19 +11,16 @@ an installer without written permission, so none of it is here.
                          it to denoise before gating, and speech detection is
                          measurably worse without it. Bundling it is what makes
                          the auto-cut behave the same on every machine.
-  ZamPlugins   GPL-2.0+  a curated six - gate, compressor, EQ, dynamic EQ,
-                         limiter, noise reduction. A complete voice chain
-                         without burying someone under the ~19 in the archive.
+ZamPlugins used to be bundled here as a voice chain. They are gone: the gate,
+compressor, EQ, expander, limiter and gain are now built into the app
+(auto_cut/effects.py, ported from OBS), which means plain sliders, nothing to
+redistribute, and no third-party plugin GUI to host.
 
-LSP Plugins were the first choice and had to be dropped: despite the LGPL
-licence they publish no Windows builds at all, only Linux and FreeBSD.
+rnnoise stays because nothing replaces it - it is a trained noise-suppression
+model, not a few lines of DSP.
 
-ZamPlugins is GPL-2.0-OR-LATER (the COPYING file says 2, but every source
-header adds "or, at your option, any later version"), so it is compatible with
-pedalboard's GPL-3. Plain GPL-2.0-only would not have been.
-
-pedalboard already makes the built application GPL-3, so a GPL plugin adds no
-obligation that is not there already.
+pedalboard already makes the built application GPL-3, so this GPL plugin adds
+no obligation that is not there already.
 
 The binaries are NOT committed - packaging/vst3/ is gitignored. Run this once
 before building, or let packaging/build.py do it.
@@ -44,22 +41,6 @@ LICENSE_DIR = os.path.join(OUT_DIR, "licences")
 # first attempt at both of these 404'd.
 RNNOISE_URL = ("https://github.com/werman/noise-suppression-for-voice/releases/"
                "download/v1.10/win-rnnoise.zip")
-
-ZAM_URL = ("https://github.com/zamaudio/zam-plugins/releases/download/"
-           "4.5/zam-plugins-4.5-win64.zip")
-
-# Exact stems, mono where there is a choice: the tracks this app handles are
-# always mono, so the X2 stereo variants would only waste a channel. About
-# 11 MB in total.
-ZAM_WANTED = [
-    "zamgate",          # noise gate - the idle mic
-    "zamcomp",          # compressor - evens out a voice
-    "zameq2",           # parametric EQ
-    "zamdynamiceq",     # dynamic EQ - doubles as a de-esser
-    "zamaximx2",        # limiter (stereo-only upstream, still fine)
-    "zamnoise",         # broadband noise reduction
-]
-
 
 def _download(url):
     print(f"  downloading {url.rsplit('/', 1)[-1]} ...", flush=True)
@@ -136,15 +117,6 @@ def main():
     try:
         taken = _extract_vst3(_download(RNNOISE_URL))
         print(f"  took {len(taken)}: {', '.join(taken) or 'nothing'}")
-    except Exception as exc:
-        print(f"  FAILED: {exc}")
-
-    print("ZamPlugins (GPL-2.0-or-later):")
-    try:
-        taken = _extract_vst3(_download(ZAM_URL), wanted=ZAM_WANTED)
-        print(f"  took {len(taken)}")
-        for name in taken:
-            print(f"    {name}")
     except Exception as exc:
         print(f"  FAILED: {exc}")
 
