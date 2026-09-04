@@ -41,9 +41,10 @@ class FxDialog(tk.Toplevel):
     def _scrolled_listbox(parent, **kwargs):
         """Listbox with vertical and horizontal scrollbars that always show."""
         wrap = ttk.Frame(parent)
-        # No padding: any gap here shows the darker window colour
-        # around the list and reads as a heavy border.
-        wrap.pack(fill="both", expand=True)
+        # Breathing room round the text. Safe now that the group behind it is
+        # the same grey as the list - the earlier dark band came from the gap
+        # showing the WINDOW colour through, not from the padding itself.
+        wrap.pack(fill="both", expand=True, padx=6, pady=(2, 0))
         vsb = ttk.Scrollbar(wrap, orient="vertical")
         hsb = ttk.Scrollbar(wrap, orient="horizontal")
         options = dict(ui_theme.listbox_options())
