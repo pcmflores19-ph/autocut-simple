@@ -38,6 +38,18 @@ LicenseFile=..\LICENSE
 PrivilegesRequiredOverridesAllowed=dialog
 PrivilegesRequired=lowest
 
+; Only ever offer to close Wavefield itself.
+;
+; Inno asks Windows which programs are holding the files it is about to
+; replace, and by default that covers every .exe and .dll being installed -
+; including the Microsoft C++ runtime that PyInstaller ships beside the app.
+; Other programs can end up bound to those copies, so a plain upgrade
+; announced that it needed to close Google Chrome. Alarming, and not something
+; a podcaster should have to reason about. Restricting the check to our own
+; executable keeps the useful behaviour - closing a running Wavefield so it
+; can be replaced - and drops the rest.
+CloseApplicationsFilter=Wavefield.exe
+
 OutputDir=output
 OutputBaseFilename=Wavefield-Setup-{#AppVersion}
 Compression=lzma2/max

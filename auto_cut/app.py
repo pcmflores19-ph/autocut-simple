@@ -2516,6 +2516,31 @@ def _check_ffmpeg():
     return False
 
 
+def _leave_the_install_directory():
+    """
+    Steps the working directory out of the program folder.
+
+    A frozen build starts with its own folder as the working directory, and
+    every process it launches inherits that - including the web browser opened
+    by the Support and Help links. Windows then searches our folder when that
+    browser resolves a DLL, and since PyInstaller ships the Microsoft C++
+    runtime beside the app, the browser can end up holding MSVCP140.dll and
+    VCRUNTIME140.dll open out of our install directory.
+
+    The visible symptom is the installer demanding to close Google Chrome
+    before it can upgrade - correctly, because those files really are in use.
+    Nothing here ever depends on the working directory: paths come from
+    `bundled`, from the project file, or from a file dialog.
+    """
+    import tempfile
+    for candidate in (os.path.expanduser("~"), tempfile.gettempdir()):
+        try:
+            os.chdir(candidate)
+            return
+        except OSError:
+            continue
+
+
 def main():
     # A frozen build has no interpreter to run plugin_editor.py with, so the
     # executable re-launches itself behind this flag to host a plugin window.
@@ -2527,6 +2552,7 @@ def main():
         return plugin_editor.main()
 
     log_handle = _start_crash_log()
+    _leave_the_install_directory()
 
     root = tk.Tk()
     root.withdraw()
