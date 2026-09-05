@@ -41,7 +41,7 @@ from silence_detector import (aggressiveness_to_min_gap, apply_mute_edits,
                               compute_keep_ranges_from_intervals, summarize)
 import voice_activity
 from waveform import extract_peaks_per_speaker, processed_peaks
-from whisperx_runner import transcribe
+from whisperx_runner import language_label, model_label, transcribe
 
 LANE_HEIGHT = 74             # per-speaker waveform lane
 RULER_HEIGHT = 18
@@ -307,6 +307,10 @@ class AutoCutApp(UIBuilderMixin, ActionsMixin):
                 self.files_list.insert("end", os.path.basename(path))
         self._invalidate_analysis()
         self._build_mixer()
+        # Straight into analysis: the waveforms, the speech detection and the
+        # cuts are all downstream of it, so there is nothing useful to do
+        # between adding a file and having them.
+        self.root.after(50, self.start_analysis)
 
     def remove_selected(self):
         selection = self.files_list.curselection()
@@ -314,6 +318,9 @@ class AutoCutApp(UIBuilderMixin, ActionsMixin):
             self.files_list.delete(index)
             del self.speaker_paths[index]
         self._invalidate_analysis()
+        self._build_mixer()
+        if self.speaker_paths:
+            self.root.after(50, self.start_analysis)
 
     def move_up(self):
         selection = self.files_list.curselection()
@@ -371,7 +378,7 @@ class AutoCutApp(UIBuilderMixin, ActionsMixin):
         self.peaks_list = []
         self.playhead = None
         self._set_export_enabled(False)
-        self.summary_label.config(text="Analyze first to preview cuts.")
+        self.summary_label.config(text="Add recordings to see the cuts.")
         self._draw_waveform()
 
     def _set_window_icon(self, root):
@@ -395,11 +402,39 @@ class AutoCutApp(UIBuilderMixin, ActionsMixin):
 
     # ---------- analysis ----------
 
+    def _set_action_state(self, busy=None):
+        """
+        Enables or disables the action row as a group.
+
+        `busy` is the name of what is running, or None when nothing is. It used
+        to be the Analyze button's own label that carried this, which meant six
+        places reconfiguring one widget to say what the app was doing; the
+        status bar already does that job properly.
+        """
+        state = "disabled" if busy else "normal"
+        for name in ("transcribe_button", "auto_cut_button", "auto_mute_button"):
+            widget = getattr(self, name, None)
+            if widget is not None:
+                widget.config(state=state)
+
     def start_analysis(self):
+        """
+        Decode, find speech, draw waveforms. Runs by itself when files change.
+
+        Everything else is built on this, so it is not something to ask
+        permission for - the old Analyze button mostly produced an app that
+        looked broken until you found it.
+        """
         if not self.speaker_paths:
-            messagebox.showwarning("No files", "Add at least one speaker recording first.")
             return
-        self.analyze_button.config(state="disabled", text="Analyzing...")
+        if getattr(self, "_analysis_running", False):
+            # Adding a second batch while the first is still decoding used to
+            # start a competing worker on the same player.
+            self._analysis_pending = True
+            return
+        self._analysis_running = True
+        self._analysis_pending = False
+        self._set_action_state("analysing")
         self._start_busy("Analyzing")
         threading.Thread(target=self._analyze_worker, daemon=True).start()
 
@@ -483,19 +518,47 @@ class AutoCutApp(UIBuilderMixin, ActionsMixin):
 
     # ---------- transcription (separate from the edit) ----------
 
-    def start_transcription(self):
+    def open_transcribe_dialog(self):
         """
-        Transcribes every track. Runs on its own, after the edit.
+        The Transcribe button: ask what to use, then run it.
 
-        Kept apart from analysis on purpose: the cuts come from the waveform and
-        are ready in seconds, while this is the slow part. Doing it afterwards
-        also means it only runs once, on an edit you have already settled.
+        Kept apart from analysis on purpose. The cuts come from the waveform
+        and are ready in seconds; this is the slow part, and not every episode
+        needs a transcript at all.
         """
         if not self.speaker_paths:
-            messagebox.showwarning("No files", "Add at least one speaker recording first.")
+            messagebox.showwarning(
+                "No recordings",
+                "Add at least one recording before transcribing.")
             return
-        self.analyze_button.config(state="disabled", text="Transcribing...")
+
+        import transcribe_dialog
+        chosen = transcribe_dialog.ask(self.root, self.language.get(),
+                                       self.whisper_model.get())
+        if not chosen:
+            return
+        language, model = chosen
+        self.language.set(language)
+        self.whisper_model.set(model)
+        self.log(f"Transcribing with {model_label(model)} in "
+                 f"{language_label(language)}.")
+        self.start_transcription()
+
+    def start_transcription(self):
+        """
+        Transcribes every track with whatever language and model are set.
+
+        Modal while it runs: it is minutes of work, it saturates the GPU, and
+        editing underneath it would only produce an edit that the arriving
+        transcript then disagrees with.
+        """
+        if not self.speaker_paths:
+            return
+        self._set_action_state("transcribing")
         self._start_busy("Transcribing")
+        self._begin_modal_export(
+            "Transcribing",
+            "WhisperX is listening to the recordings. This is the slow part.")
         threading.Thread(target=self._transcribe_worker, daemon=True).start()
 
     def _transcribe_worker(self):
@@ -513,6 +576,10 @@ class AutoCutApp(UIBuilderMixin, ActionsMixin):
             words_per_speaker = []
             all_segments = []
             for index, path in enumerate(self.speaker_paths):
+                self._export_step(
+                    f"{os.path.basename(path)}  ({index + 1} of "
+                    f"{len(self.speaker_paths)})",
+                    index / max(1, len(self.speaker_paths)))
                 data = transcribe(path, model=model, language=language,
                                   progress=self.log)
                 words = data["words"]
@@ -538,23 +605,23 @@ class AutoCutApp(UIBuilderMixin, ActionsMixin):
 
     def _transcription_done(self):
         self._stop_busy()
-        self.analyze_button.config(state="normal", text="Analyze")
+        self._set_action_state(None)
+        self._end_modal_export()
         self._render_transcript()
 
     def _transcription_failed(self, exc):
         self._stop_busy()
-        self.analyze_button.config(state="normal", text="Analyze")
+        self._set_action_state(None)
+        self._end_modal_export()
         messagebox.showerror("Transcription failed", str(exc))
 
     def _analysis_done(self):
         self._stop_busy()
-        self.analyze_button.config(state="normal", text="Analyze")
-        # The edit is already usable; transcription runs on from here by itself
-        # so the transcript is ready without having to remember to start it.
-        # Skipped if words came back with a
-        # saved project - re-running would cost minutes and change nothing.
-        if not self.per_speaker_words:
-            self.root.after(200, self.start_transcription)
+        self._analysis_running = False
+        self._set_action_state(None)
+        # Transcription is NOT started here any more. It costs minutes of GPU
+        # time and not every episode needs a transcript, so it waits for the
+        # Transcribe button rather than beginning because a file was added.
         self._set_export_enabled(True)
         # Grow the canvas to fit one lane per speaker.
         lane_total = RULER_HEIGHT + len(self.peaks_list) * LANE_HEIGHT
@@ -567,6 +634,9 @@ class AutoCutApp(UIBuilderMixin, ActionsMixin):
         self._restore_project_audio_state()
         self._render_transcript()
         self._update_summary()
+        if getattr(self, "_analysis_pending", False):
+            self._analysis_pending = False
+            self.root.after(50, self.start_analysis)
         # Scenes are derived from this analysis, so they have to be rebuilt
         # here. Setting V3 or switching cameras on recomputes them too, but
         # neither happens when a project is reopened with switching already
@@ -575,41 +645,11 @@ class AutoCutApp(UIBuilderMixin, ActionsMixin):
 
     def _analysis_failed(self, exc):
         self._stop_busy()
-        self.analyze_button.config(state="normal", text="Analyze")
+        self._analysis_running = False
+        self._set_action_state(None)
         messagebox.showerror("Analysis failed", str(exc))
 
     # ---------- preview + export ----------
-
-    def _on_language_change(self, label):
-        from whisperx_runner import LANGUAGES
-        for text, value in LANGUAGES:
-            if text == label:
-                if value != self.language.get():
-                    self.language.set(value)
-                    self.log(f"Language set to {text} - re-run Analyze to "
-                             "transcribe in that language.")
-                    self._invalidate_analysis()
-                break
-
-    def _on_model_change(self, label):
-        from whisperx_runner import MODELS, device
-        for text, value in MODELS:
-            if text != label:
-                continue
-            if value == self.whisper_model.get():
-                break
-            self.whisper_model.set(value)
-            self.log(f"Whisper model set to {value} - re-run Analyze to "
-                     "transcribe with it.")
-            # Warn about the one combination that reliably looks like a hang.
-            if value.startswith("large") and device() == "cpu":
-                self.log("  no NVIDIA GPU here, and a large model on the CPU "
-                         "can take hours for an hour-long recording. 'small' "
-                         "or 'base' is the better choice.")
-            self._invalidate_analysis()
-            break
-
-    # ---------- vodcast: three cameras, one conversation ----------
 
     def vodcast_problem(self):
         """
@@ -625,7 +665,7 @@ class AutoCutApp(UIBuilderMixin, ActionsMixin):
         if not self.v3_path:
             return "Set the merged video (V3) first."
         if not self.speaker_media:
-            return "Run Analyze first."
+            return "Still reading the recordings - try again in a moment."
         if not all(getattr(m, "has_video", False) for m in self.speaker_media):
             return ("Both speaker recordings need a picture - audio-only files "
                     "have nothing to cut between.")
@@ -2207,8 +2247,10 @@ class AutoCutApp(UIBuilderMixin, ActionsMixin):
                                    "No video survived the current settings.")
             return
         if not self.speaker_media:
-            messagebox.showwarning("Analyze first",
-                                   "Add recordings and run Analyze first.")
+            messagebox.showwarning(
+                "Nothing to export",
+                "Add recordings first. Wavefield reads them as soon as they "
+                "are added.")
             return
 
         # Speaker 0 is the one that becomes V1 in the timeline export; use the

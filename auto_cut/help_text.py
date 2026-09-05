@@ -26,23 +26,31 @@ All the recordings must start at the same moment. That is what OBS produces.
 There is no sync correction, so a file that starts late will stay late.
 
 
-2. CLICK ANALYZE
+2. WAIT A MOMENT
 
-Speech is found from the waveform. Each track is normalised, denoised, and run
-through a gate that decides talking from not-talking. Neither the normalising
-nor the denoising touches your audio - they only inform the decision.
+Nothing to click. Adding a recording starts the work: speech is found from the
+waveform, with each track normalised, denoised and run through a gate that
+decides talking from not-talking. Neither the normalising nor the denoising
+touches your audio - they only inform the decision.
 
 The first run on a file has to decode it, which takes a few minutes for an
-hour-long recording. After that it is cached and re-runs are quick.
+hour-long recording. After that it is cached and re-runs are quick. The bar at
+the bottom of the window shows how it is getting on.
 
-If WhisperX is installed, transcription starts automatically once the cuts are
-ready. You do not have to wait for it - the edit is already usable.
+Auto-cut and Auto-mute are the two buttons underneath. They light up when they
+are on. Auto-cut starts on; Auto-mute does not, because it only makes sense
+with a microphone each.
 
-The Model dropdown decides how good and how slow that transcription is. Bigger
-is better and much slower: tiny and base suit any laptop, small is a fair
-compromise on a processor, and the large models really want an NVIDIA graphics
-card. Choosing a large model without one is the most common reason people think
-the app has frozen - it has not, it is just going to take hours.
+TRANSCRIBE is separate, and deliberately not automatic - it is minutes of work
+even on a good graphics card, and plenty of episodes never need one. Pressing
+it asks which language, and which model.
+
+The model decides how good and how slow the transcript is. Bigger is better and
+much slower: tiny and base suit any laptop, small is a fair compromise on a
+processor, and the large models really want an NVIDIA graphics card. Choosing a
+large model without one is the most common reason people think the app has
+frozen - it has not, it is just going to take hours. Wavefield warns you in the
+dialog when that is what you have picked.
 
 
 3. SET THE AGGRESSIVENESS
@@ -157,7 +165,7 @@ Transcription is very slow
     Without an NVIDIA graphics card it runs on the processor, which is slow for
     a long recording. Use a smaller model, or skip it.
 
-Analysis seems stuck
+Reading the recordings seems stuck
     The first pass on a file decodes the whole recording, which can take a few
     minutes per hour of audio. Watch the LOG panel - it reports each step.
 

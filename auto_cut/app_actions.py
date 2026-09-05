@@ -62,7 +62,6 @@ class ActionsMixin:
         self.speaker_media = []
         self._pending_project = None
         self.whisper_model.set(DEFAULT_MODEL)
-        self.model_box.set(model_label(DEFAULT_MODEL))
         self.aggressiveness.set(50)
         self.auto_mute_on.set(False)
         self.auto_cut_on.set(True)
@@ -174,15 +173,15 @@ class ActionsMixin:
         # minutes re-transcribing audio that has not changed.
         self.per_speaker_words = data.get("words") or None
 
+        # Restored into the variables the Transcribe dialog reads; there are
+        # no dropdowns in the inspector to keep in step any more.
         language = data.get("language")
         if language:
             self.language.set(language)
-            self.language_box.set(language_label(language))
 
         model = data.get("whisper_model")
         if model:
             self.whisper_model.set(model)
-            self.model_box.set(model_label(model))
 
         self._pending_project = data      # chains/tracks restored after analysis
         # Intro/outro moved to the Export menu, which has nowhere to show a
@@ -233,7 +232,7 @@ class ActionsMixin:
         segments = (self.transcript or {}).get("segments", [])
         if not segments:
             self.transcript_text.insert("1.0",
-                                        "Analyze the recordings to produce a transcript.")
+                                        "Press Transcribe to produce a transcript.")
             return
         for segment in segments:
             stamp = self._fmt_time(segment["start"])

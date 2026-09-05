@@ -95,6 +95,30 @@ def apply(root):
     style.configure("Accent.TButton", background=ACCENT_DIM, foreground="#f0f0f0")
     style.map("Accent.TButton", background=[("active", ACCENT), ("disabled", PANEL)])
 
+    # A checkbutton that looks like a button rather than a tick box, for
+    # Auto-cut and Auto-mute. A Checkbutton rather than a Button because it
+    # already owns the on/off variable and gets the "selected" state for free;
+    # only the indicator has to go, which is done by cloning the button layout.
+    # Off reads as an outline, on as a filled accent - the same colour language
+    # as Accent.TButton, so it looks native to the rest of the window.
+    try:
+        style.layout("Toggle.TCheckbutton", style.layout("TButton"))
+    except tk.TclError:
+        pass                # falls back to a normal checkbutton, still usable
+    style.configure("Toggle.TCheckbutton", background=PANEL_LIGHT,
+                    foreground=TEXT_DIM, bordercolor=BORDER,
+                    focuscolor=PANEL_LIGHT, padding=(6, 5), anchor="center",
+                    font=FONT)
+    style.map("Toggle.TCheckbutton",
+              background=[("selected", "!disabled", ACCENT_DIM),
+                          ("active", "#3a3a3a"),
+                          ("disabled", PANEL)],
+              foreground=[("selected", "!disabled", "#f8f8f8"),
+                          ("disabled", "#5a5a5a")],
+              bordercolor=[("selected", ACCENT)],
+              lightcolor=[("selected", ACCENT_DIM)],
+              darkcolor=[("selected", ACCENT_DIM)])
+
     style.configure("TCheckbutton", background=BG, foreground=TEXT,
                     focuscolor=BG, indicatorcolor=PANEL_LIGHT)
     style.map("TCheckbutton",

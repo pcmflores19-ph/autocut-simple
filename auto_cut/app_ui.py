@@ -16,8 +16,7 @@ import links
 import ui_theme
 import value_entry
 import version
-from whisperx_runner import (DEFAULT_LANGUAGE, DEFAULT_MODEL, LANGUAGES,
-                             MODELS, language_label, model_label)
+from whisperx_runner import DEFAULT_LANGUAGE, DEFAULT_MODEL
 
 LANE_HEIGHT = 74
 RULER_HEIGHT = 18
@@ -165,18 +164,6 @@ class UIBuilderMixin:
                                 style="Menu.TMenubutton", direction="below")
         button.pack(side=side)
         return button
-
-    def _labelled_combo(self, parent, label, values, initial, on_change):
-        """A caption and a read-only dropdown on their own row."""
-        row = ttk.Frame(parent, style="Panel.TFrame")
-        row.pack(fill="x", padx=8, pady=(4, 0))
-        ttk.Label(row, text=label, width=9,
-                  style="PanelDim.TLabel").pack(side="left")
-        box = ttk.Combobox(row, state="readonly", height=24, values=values)
-        box.set(initial)
-        box.bind("<<ComboboxSelected>>", lambda e: on_change(box.get()))
-        box.pack(side="left", fill="x", expand=True)
-        return box
 
     def open_settings(self):
         from settings_dialog import SettingsDialog
@@ -461,29 +448,43 @@ class UIBuilderMixin:
         ttk.Button(buttons, text="Up", width=8,
                    command=self.move_up).pack(fill="x", pady=1)
 
-        analyze = ttk.Frame(inspector, style="Panel.TFrame")
-        analyze.pack(fill="x", padx=8, pady=(6, 0))
-        self.analyze_button = ttk.Button(analyze, text="Analyze", width=11,
-                                         style="Accent.TButton",
-                                         command=self.start_analysis)
-        self.analyze_button.pack(side="left")
+        # Analysis is no longer a button. Waveforms and speech detection are
+        # what every other feature is built on, so making the user ask for them
+        # only ever produced an app that looked broken until you found the
+        # button. Adding a recording starts it.
+        #
+        # What is left are the things that are genuinely a choice: transcribing
+        # (minutes of GPU time, and not everyone wants a transcript) and the
+        # two automatic edits.
+        actions = ttk.Frame(inspector, style="Panel.TFrame")
+        actions.pack(fill="x", padx=8, pady=(6, 0))
+        actions.columnconfigure(0, weight=1)
+        actions.columnconfigure(1, weight=1)
 
-        # Language and model get a row each rather than sharing the button's.
-        # The inspector is 340px and these dropdowns are wide; crowding three
-        # widgets onto one line is how the last label ended up clipped.
-        # Both are chosen BEFORE Analyze, because analysis runs the
-        # transcription straight after finding the cuts.
+        self.transcribe_button = ttk.Button(
+            actions, text="Transcribe", style="Accent.TButton",
+            command=self.open_transcribe_dialog)
+        self.transcribe_button.grid(row=0, column=0, columnspan=2,
+                                    sticky="ew", padx=1, pady=1)
+
+        # Language and model are chosen in the Transcribe dialog now - two
+        # places to set one thing, one of which did nothing until you pressed a
+        # button elsewhere, was worse than one. The variables stay because
+        # projects save and restore them.
         self.language = tk.StringVar(value=DEFAULT_LANGUAGE)
-        self.language_box = self._labelled_combo(
-            inspector, "Language", [label for label, _ in LANGUAGES],
-            language_label(DEFAULT_LANGUAGE),
-            lambda value: self._on_language_change(value))
-
         self.whisper_model = tk.StringVar(value=DEFAULT_MODEL)
-        self.model_box = self._labelled_combo(
-            inspector, "Model", [label for label, _ in MODELS],
-            model_label(DEFAULT_MODEL),
-            lambda value: self._on_model_change(value))
+
+        self.auto_cut_on = tk.BooleanVar(value=True)
+        self.auto_cut_button = ttk.Checkbutton(
+            actions, text="Auto-cut", style="Toggle.TCheckbutton",
+            variable=self.auto_cut_on, command=self._on_auto_cut_toggle)
+        self.auto_cut_button.grid(row=1, column=0, sticky="ew", padx=1, pady=1)
+
+        self.auto_mute_on = tk.BooleanVar(value=False)
+        self.auto_mute_button = ttk.Checkbutton(
+            actions, text="Auto-mute", style="Toggle.TCheckbutton",
+            variable=self.auto_mute_on, command=self._on_auto_mute_toggle)
+        self.auto_mute_button.grid(row=1, column=1, sticky="ew", padx=1, pady=1)
 
         ttk.Separator(inspector).pack(fill="x", padx=8, pady=8)
 
@@ -507,21 +508,11 @@ class UIBuilderMixin:
                                      wraplength=INSPECTOR_WIDTH - 40,
                                      justify="left")
         self.aggr_detail.pack(anchor="w", padx=8)
-        self.summary_label = ttk.Label(inspector, text="Analyze to preview cuts.",
+        self.summary_label = ttk.Label(inspector, text="Add recordings to see the cuts.",
                                        style="PanelDim.TLabel",
                                        wraplength=INSPECTOR_WIDTH - 40,
                                        justify="left")
         self.summary_label.pack(anchor="w", padx=8, pady=(2, 6))
-
-        self.auto_cut_on = tk.BooleanVar(value=True)
-        ttk.Checkbutton(inspector, text="Auto-cut dead air",
-                        style="Panel.TCheckbutton", variable=self.auto_cut_on,
-                        command=self._on_auto_cut_toggle).pack(anchor="w", padx=8)
-
-        self.auto_mute_on = tk.BooleanVar(value=False)
-        ttk.Checkbutton(inspector, text="Auto-mute inactive speaker",
-                        style="Panel.TCheckbutton", variable=self.auto_mute_on,
-                        command=self._on_auto_mute_toggle).pack(anchor="w", padx=8)
 
         ttk.Separator(inspector).pack(fill="x", padx=8, pady=8)
 
