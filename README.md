@@ -260,7 +260,50 @@ If it saves you time, you can support the show:
 Source, build instructions and the reasoning behind the design:
 [docs/DEVELOPERS.md](docs/DEVELOPERS.md).
 
-Wavefield includes GPL-licensed components, so the program as distributed is
-covered by the **GNU General Public License version 3**. See
-`THIRD-PARTY-NOTICES.txt`, installed alongside the program, for details and for
-how to request the source code.
+---
+
+## Licence
+
+Copyright © 2026 Paul Flores.
+
+Wavefield is free software under the **GNU General Public License version 3** —
+see [LICENSE](LICENSE). It bundles pedalboard and rnnoise, which are themselves
+GPL-3, and that is what makes the program as a whole GPL-3 rather than
+something more permissive. `THIRD-PARTY-NOTICES.txt` is installed alongside the
+program and lists every bundled component with its own licence.
+
+You are free to use, study, share and modify it. If you distribute a modified
+version, you have to make your source available under the same licence.
+
+---
+
+## Code signing policy
+
+Release builds are signed so Windows can verify they came from this project and
+have not been altered since.
+
+> **Status:** signing is being set up now. Builds up to and including v1.0.0 are
+> **not** signed, which is why Windows may warn about them or, on some machines,
+> refuse to run them. See [Download](#download) for what to do meanwhile.
+
+- Wavefield is built and signed **only** by the automated release workflow in
+  [`.github/workflows/`](.github/workflows), from the source in this
+  repository. Nothing is signed from a developer's machine.
+- Signing uses a free certificate granted to open-source projects by the
+  [SignPath Foundation](https://signpath.org/), with the certificate held by
+  SignPath — this project never possesses the private key.
+- Every signing request requires manual approval by the project maintainer
+  (Paul Flores).
+- The only official download is the
+  [Releases page](../../releases/latest) of this repository. A copy of
+  Wavefield obtained anywhere else is not something this project can vouch for.
+
+To check a download yourself: right-click the file, choose **Properties**, and
+look at the **Digital Signatures** tab.
+
+### Privacy
+
+Wavefield does its work entirely on your computer. It does not upload your
+recordings, your transcripts or your projects anywhere. The only network
+request it ever makes is to GitHub, and only when you choose **Help ▸ Check for
+updates**.
