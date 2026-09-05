@@ -108,8 +108,13 @@ class SettingsDialog(tk.Toplevel):
                              "installation - reinstall Wavefield to restore it.")
             return
         try:
+            # -Force: the script skips itself when WhisperX is already
+            # working, which is right for the installer running on every
+            # upgrade and wrong here, where pressing the button is the
+            # deliberate act of asking for it again.
             subprocess.Popen(["powershell.exe", "-NoProfile",
-                              "-ExecutionPolicy", "Bypass", "-File", script],
+                              "-ExecutionPolicy", "Bypass", "-File", script,
+                              "-Force"],
                              creationflags=getattr(subprocess,
                                                    "CREATE_NEW_CONSOLE", 0))
         except Exception as exc:

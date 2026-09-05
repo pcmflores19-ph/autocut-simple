@@ -10,6 +10,8 @@
 # Run by the installer, and again from Wavefield's Settings window if it is
 # ever needed a second time. Safe to re-run.
 
+param([switch]$Force)
+
 $ErrorActionPreference = "Stop"
 $envDir      = Join-Path $env:LOCALAPPDATA "Wavefield\whisperx-env"
 $settingsDir = Join-Path $env:APPDATA "AutoCut"
@@ -22,6 +24,62 @@ Say ""
 Say "  Setting up speech recognition for Wavefield"
 Say "  ==========================================="
 Say ""
+
+# ------------------------------------------------- is it already here?
+#
+# This script is offered by the installer, which runs again on every upgrade -
+# so without this check an upgrade re-downloads gigabytes over a working
+# install. Worse, someone who set WhisperX up themselves and pointed Wavefield
+# at it would get a second copy built behind their back and their setting
+# repointed at it.
+#
+# So: look first. An existing WhisperX that actually runs is left completely
+# alone. -Force is for the Settings button, where asking for it again is a
+# deliberate act.
+function Test-Whisperx($exe) {
+    if (-not $exe -or -not (Test-Path $exe)) { return $false }
+    $python = Join-Path (Split-Path $exe) "python.exe"
+    if (-not (Test-Path $python)) { return $false }
+    try {
+        $null = & $python -c "import whisperx" 2>$null
+        return ($LASTEXITCODE -eq 0)
+    } catch {
+        return $false
+    }
+}
+
+if (-not $Force) {
+    $existing = $null
+
+    # What Wavefield is configured to use, which may be an install the user
+    # made themselves long before they met this script.
+    if (Test-Path $settings) {
+        try {
+            $configured = (Get-Content $settings -Raw | ConvertFrom-Json).whisperx_path
+            if (Test-Whisperx $configured) { $existing = $configured }
+        } catch { }
+    }
+    # Failing that, the one this script would have built.
+    if (-not $existing) {
+        $ours = Join-Path $envDir "Scripts\whisperx.exe"
+        if (Test-Whisperx $ours) { $existing = $ours }
+    }
+
+    if ($existing) {
+        Say "  Speech recognition is already set up on this computer:"
+        Say ""
+        Say "    $existing"
+        Say ""
+        Say "  Nothing to do - leaving it exactly as it is." -ForegroundColor Green
+        Say ""
+        Say "  To install it again anyway, use Install WhisperX in Wavefield's"
+        Say "  File > Settings window."
+        Say ""
+        Read-Host "  Press Enter to close"
+        exit 0
+    }
+}
+
 Say "  This downloads about 2-3 GB and usually takes 5-15 minutes."
 Say "  You only ever have to do this once."
 Say ""
