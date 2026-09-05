@@ -80,11 +80,84 @@ class UIBuilderMixin:
         self._build_export_menu(bar)
         self._build_help_menu(bar)
         # Packed to the right, away from the menus you actually work with.
+        # Support goes on first so it stays hard right: with side="right", tk
+        # places each new widget further left, so whatever is packed last sits
+        # nearest the middle.
         self._build_support_menu(bar, side="right")
+        self._build_update_dot(bar)
 
         self.root.bind("<Control-s>", lambda e: self.save_project())
         self.root.bind("<Control-o>", lambda e: self.open_project())
         self.root.bind("<Control-n>", lambda e: self.new_project())
+
+    def _build_update_dot(self, bar):
+        """
+        A coloured dot that says whether this copy is the newest one.
+
+        Wavefield is installed by people who will never think to look in a menu
+        for a new version, and an out-of-date copy is how a fixed bug goes on
+        being reported. A dot is small enough to ignore and impossible to miss
+        once it turns red.
+
+        Grey until the check finishes, so it never claims to know something it
+        does not.
+        """
+        size = 14
+        self.update_dot = tk.Canvas(bar, width=size, height=size,
+                                    background=ui_theme.PANEL,
+                                    highlightthickness=0, borderwidth=0)
+        self._update_dot_item = self.update_dot.create_oval(
+            3, 3, size - 3, size - 3,
+            fill=ui_theme.TEXT_DIM, outline="")
+        self.update_dot.pack(side="right", padx=(6, 10))
+
+        self._update_status = "unknown"
+        self._update_release = None
+        self._update_tip = ui_theme.attach_tooltip(
+            self.update_dot, self._update_dot_caption)
+        self.update_dot.bind("<Button-1>", self._on_update_dot_click)
+
+    def _update_dot_caption(self):
+        if self._update_status == "current":
+            return f"{version.APP_NAME} {version.__version__} is up to date"
+        if self._update_status == "available":
+            newer = (self._update_release or {}).get("version", "?")
+            return (f"Version {newer} is available - "
+                    f"you have {version.__version__}." + chr(10) +
+                    "Click for options.")
+        if self._update_status == "checking":
+            return "Checking for updates..."
+        return ("Could not check for updates." + chr(10) +
+                "Use Help > Check for updates to try again.")
+
+    def _set_update_dot(self, status, release=None):
+        """Repaints the dot. Safe to call before the widget exists."""
+        if not hasattr(self, "update_dot"):
+            return
+        self._update_status = status
+        self._update_release = release
+        colour = {
+            "current": ui_theme.OK_GREEN,
+            "available": ui_theme.BAD_RED,
+            "checking": ui_theme.TEXT_DIM,
+        }.get(status, ui_theme.TEXT_DIM)
+        self.update_dot.itemconfigure(self._update_dot_item, fill=colour)
+        # Only worth clicking when there is something to do about it.
+        self.update_dot.configure(
+            cursor="hand2" if status == "available" else "")
+
+    def _on_update_dot_click(self, event):
+        if self._update_status != "available" or not self._update_release:
+            return
+        menu = tk.Menu(self.root, **ui_theme.menu_options())
+        menu.add_command(label="Install update...",
+                         command=lambda: self.install_update(self._update_release))
+        menu.add_command(label="What's new",
+                         command=lambda: self.show_release_notes(self._update_release))
+        try:
+            menu.tk_popup(event.x_root, event.y_root)
+        finally:
+            menu.grab_release()
 
     def _add_menu(self, bar, label, menu, side="left"):
         """Puts one dropdown on the bar and returns its button."""

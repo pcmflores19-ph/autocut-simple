@@ -57,6 +57,24 @@ class SettingsDialog(tk.Toplevel):
         ttk.Label(frame, style="PanelDim.TLabel",
                   text="Leave blank to search automatically.").pack(anchor="w")
 
+        ttk.Separator(frame).pack(fill="x", pady=(12, 10))
+        ttk.Label(frame, text="UPDATES", style="PanelDim.TLabel").pack(anchor="w")
+        self.check_updates = tk.BooleanVar(
+            value=bool(settings.get("check_updates_on_start")))
+        ttk.Checkbutton(
+            frame, variable=self.check_updates,
+            style="Panel.TCheckbutton",
+            text="Check for a newer version when Wavefield opens"
+        ).pack(anchor="w", pady=(2, 0))
+        ttk.Label(frame, style="PanelDim.TLabel", justify="left",
+                  wraplength=660,
+                  text="This is the only time Wavefield uses the internet. It "
+                       "asks GitHub for the latest version number and nothing "
+                       "else - your recordings never leave this computer. With "
+                       "this off, the dot in the menu bar stays grey and you "
+                       "can still check by hand from the Help menu."
+                  ).pack(anchor="w", pady=(2, 0))
+
         self.status = ttk.Label(frame, style="PanelDim.TLabel", justify="left",
                                 wraplength=660, text="")
         self.status.pack(anchor="w", pady=(10, 0))
@@ -214,6 +232,7 @@ class SettingsDialog(tk.Toplevel):
     def _save(self):
         path = self.path_var.get().strip()
         settings.set_value("whisperx_path", path)
+        settings.set_value("check_updates_on_start", bool(self.check_updates.get()))
         # Force the next transcription to re-resolve rather than reuse whatever
         # was decided at startup.
         whisperx_runner._resolved = None

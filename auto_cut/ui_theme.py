@@ -7,6 +7,7 @@ Resolve 21's edit page: near-black panels, mid-grey controls, a single warm
 accent used sparingly.
 """
 
+import tkinter as tk
 from tkinter import ttk
 
 # Palette
@@ -206,3 +207,87 @@ def text_options():
         "borderwidth": 0,
         "font": FONT,
     }
+
+
+# Status colours, shared by the loudness meters and the update indicator. The
+# meters had their own copies in app.py; these are the same values, in the one
+# place a widget outside app.py can reach them.
+OK_GREEN = "#3fbf6f"
+WARN_YELLOW = "#e8c341"
+BAD_RED = "#e0503f"
+
+
+class Tooltip:
+    """
+    Hover text for one widget.
+
+    tkinter has no tooltip of its own, and the update indicator is a coloured
+    dot whose whole meaning is otherwise a guess. Written as a class so the
+    text can be re-read on every hover: the dot's tooltip changes as the update
+    check completes, and a caption captured once at construction would still be
+    saying "checking..." an hour later.
+
+    `text` may be a string or a zero-argument callable.
+    """
+
+    DELAY_MS = 450          # long enough not to fire while crossing the widget
+
+    def __init__(self, widget, text):
+        self.widget = widget
+        self.text = text
+        self.window = None
+        self._after = None
+        widget.bind("<Enter>", self._schedule, add="+")
+        widget.bind("<Leave>", self._hide, add="+")
+        widget.bind("<ButtonPress>", self._hide, add="+")
+
+    def _schedule(self, _event=None):
+        self._cancel()
+        self._after = self.widget.after(self.DELAY_MS, self._show)
+
+    def _cancel(self):
+        if self._after is not None:
+            try:
+                self.widget.after_cancel(self._after)
+            except Exception:
+                pass
+            self._after = None
+
+    def _show(self):
+        if self.window is not None:
+            return
+        caption = self.text() if callable(self.text) else self.text
+        if not caption:
+            return
+        x = self.widget.winfo_rootx() + 12
+        y = self.widget.winfo_rooty() + self.widget.winfo_height() + 6
+
+        self.window = tk.Toplevel(self.widget)
+        self.window.wm_overrideredirect(True)      # no title bar, no border
+        self.window.configure(background=BORDER)
+        label = tk.Label(self.window, text=caption, justify="left",
+                         background=PANEL_LIGHT, foreground=TEXT,
+                         font=FONT_SMALL, padx=8, pady=4)
+        label.pack(padx=1, pady=1)                 # 1px BORDER shows as a frame
+
+        # Keep it on screen when the widget is near the right or bottom edge.
+        self.window.update_idletasks()
+        width = self.window.winfo_width()
+        height = self.window.winfo_height()
+        screen_w = self.widget.winfo_screenwidth()
+        screen_h = self.widget.winfo_screenheight()
+        x = min(x, screen_w - width - 8)
+        if y + height > screen_h - 8:
+            y = self.widget.winfo_rooty() - height - 6
+        self.window.wm_geometry(f"+{max(0, x)}+{max(0, y)}")
+
+    def _hide(self, _event=None):
+        self._cancel()
+        if self.window is not None:
+            self.window.destroy()
+            self.window = None
+
+
+def attach_tooltip(widget, text):
+    """Convenience wrapper - returns the Tooltip so callers can keep it."""
+    return Tooltip(widget, text)

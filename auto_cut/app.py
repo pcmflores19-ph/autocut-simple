@@ -140,6 +140,10 @@ class AutoCutApp(UIBuilderMixin, ActionsMixin):
         self._tick()
         self._schedule_autosave()
         self.root.after(400, self.offer_recovery)
+        # After the window is up and any recovery prompt has been dealt with -
+        # a check that fires into a half-drawn window has nowhere to show its
+        # result.
+        self.root.after(2500, self._startup_update_check)
         root.bind("<space>", self._on_space)
         self._bind_shortcuts(root)
         root.bind_all("<MouseWheel>", self._on_wheel_anywhere)
@@ -828,25 +832,166 @@ class AutoCutApp(UIBuilderMixin, ActionsMixin):
 
     # ---------- updates ----------
 
-    def check_for_updates(self):
+    def check_for_updates(self, announce=True):
         """
-        Help > Check for updates. Never runs on its own.
+        Help > Check for updates, and once quietly at startup.
 
         The request goes on a worker thread and reports back through
         root.after: a network that hangs rather than refusing would otherwise
         freeze the whole window until it timed out.
-        """
-        self.log("Checking for updates...")
-        threading.Thread(target=self._updates_worker, daemon=True).start()
 
-    def _updates_worker(self):
+        `announce` False is the startup check: it repaints the dot and says
+        nothing else. Only a check the user asked for may open a dialog.
+        """
+        if announce:
+            self.log("Checking for updates...")
+        self._set_update_dot("checking")
+        threading.Thread(target=self._updates_worker, args=(announce,),
+                         daemon=True).start()
+
+    def _startup_update_check(self):
+        """
+        The one network request Wavefield makes, and only with permission.
+
+        Deliberately silent: at startup the dot is the whole user interface for
+        this. A dialog in front of someone who just opened the app to do
+        something else is the interruption the setting exists to prevent.
+        """
+        import settings
+        if not settings.get("check_updates_on_start"):
+            return
+        self.check_for_updates(announce=False)
+
+    def _updates_worker(self, announce=True):
         import updates
         status, release = updates.check()
-        self.root.after(0, lambda: self._updates_done(status, release))
+        self.root.after(0, lambda: self._updates_done(status, release, announce))
 
-    def _updates_done(self, status, release):
+    def install_update(self, release):
+        """
+        Downloads the new installer and hands over to it.
+
+        Wavefield cannot replace its own files while it is running, so the job
+        is to fetch the installer, start it and get out of the way. Modal,
+        because carrying on editing during it would not be useful.
+        """
+        installer = (release or {}).get("installer")
+        if not installer:
+            # A release with no installer attached is a packaging mistake, not
+            # something the user can act on - send them to the page.
+            messagebox.showinfo(
+                "No download available",
+                "This release has no installer attached." + chr(10) * 2 +
+                "Opening the releases page instead.")
+            self._open_url((release or {}).get("url", ""))
+            return
+
+        if not messagebox.askokcancel(
+                "Install update",
+                "Download " + installer["name"] +
+                " (%.0f MB) and run it?" % (installer["size"] / 1e6) +
+                chr(10) * 2 +
+                "Wavefield will close so the installer can replace it. Save "
+                "your project first if you have unsaved changes."):
+            return
+
+        self._begin_modal_export("Downloading update",
+                                 "Fetching " + installer["name"] + "...")
+        threading.Thread(target=self._download_update_worker,
+                         args=(installer,), daemon=True).start()
+
+    def _download_update_worker(self, installer):
+        import tempfile
+        import urllib.request
+
+        try:
+            url = installer["url"]
+            # Only ever fetch from GitHub. The URL arrives from an API
+            # response, so this is cheap insurance against following it
+            # somewhere else entirely.
+            if not url.startswith("https://github.com/"):
+                raise ValueError("the download link is not a GitHub address")
+
+            target = os.path.join(tempfile.gettempdir(), installer["name"])
+            total = installer.get("size") or 0
+            request = urllib.request.Request(
+                url,
+                headers={"User-Agent": version.APP_NAME + "/" + version.__version__})
+            done = 0
+            response = urllib.request.urlopen(request, timeout=30)
+            try:
+                with open(target, "wb") as handle:
+                    while True:
+                        if self._export_cancelled():
+                            raise KeyboardInterrupt
+                        chunk = response.read(256 * 1024)
+                        if not chunk:
+                            break
+                        handle.write(chunk)
+                        done += len(chunk)
+                        if total:
+                            self._export_step(
+                                "%.0f of %.0f MB" % (done / 1e6, total / 1e6),
+                                done / total)
+            finally:
+                response.close()
+
+            if total and abs(os.path.getsize(target) - total) > 1024:
+                raise ValueError("the download did not complete")
+
+            self.root.after(0, lambda: self._update_downloaded(target))
+        except KeyboardInterrupt:
+            self.root.after(0, self._update_download_cancelled)
+        except Exception as exc:
+            self.root.after(0, lambda e=exc: self._update_download_failed(e))
+
+    def _update_downloaded(self, path):
+        self._end_modal_export()
+        self.log("Downloaded " + os.path.basename(path))
+        try:
+            os.startfile(path)
+        except Exception as exc:
+            messagebox.showerror(
+                "Could not start the installer",
+                "The update was downloaded to:" + chr(10) + path + chr(10) * 2 +
+                "but could not be started:" + chr(10) + str(exc))
+            return
+        # A moment for the installer to appear before this window vanishes.
+        self.root.after(400, self._on_close)
+
+    def _update_download_cancelled(self):
+        self._end_modal_export()
+        self.log("Update download cancelled.")
+
+    def _update_download_failed(self, exc):
+        self._end_modal_export()
+        self.log("Update download failed: " + str(exc))
+        import updates
+        if messagebox.askyesno(
+                "Download failed",
+                "The update could not be downloaded:" + chr(10) * 2 + str(exc) +
+                chr(10) * 2 + "Open the releases page instead?"):
+            self._open_url(updates.RELEASES_URL)
+
+    def show_release_notes(self, release):
+        """What's new - the release notes exactly as published on GitHub."""
+        release = release or {}
+        notes = release.get("notes") or "No release notes were published."
+        self._show_help("What's new in " + release.get("name", "the latest release"),
+                        notes)
+
+    def _updates_done(self, status, release, announce=True):
         import updates
         from version import __version__
+
+        self._set_update_dot(status, release)
+        if not announce:
+            # The startup check speaks only through the dot, and through one
+            # log line worth having if something newer exists.
+            if status == "available":
+                self.log("Update available: " + release["version"] +
+                         " (you have " + __version__ + ").")
+            return
 
         if status == "available":
             newer = release["version"]

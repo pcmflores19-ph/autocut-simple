@@ -22,6 +22,13 @@ DEFAULTS = {
     # because installing it into its own virtualenv is the sensible way to do
     # it and that is never on the PATH.
     "whisperx_path": "",
+
+    # Whether to ask GitHub for a newer release when the app opens. On by
+    # default, but a real setting rather than a hidden behaviour: this is the
+    # only network request Wavefield ever makes, and someone who wants a
+    # machine that talks to nothing should be able to have one. Help > Check
+    # for updates still works either way.
+    "check_updates_on_start": True,
 }
 
 
