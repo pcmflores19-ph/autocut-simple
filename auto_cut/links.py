@@ -6,7 +6,7 @@ Kept in their own file so changing a link never means touching UI code.
 instead of opening a dead page.
 """
 
-BUY_ME_A_COFFEE = "https://buymeacoffee.com/podcastmesm"
+BUY_ME_A_COFFEE = "https://buymeacoffee.com/btspodcastph"
 YOUTUBE = "https://www.youtube.com/@marineearthscience"
 # The share link carries a tracking parameter; the bare show URL is cleaner
 # and works the same.

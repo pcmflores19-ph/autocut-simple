@@ -259,7 +259,7 @@ for anyone else to use.
 
 If it saves you time, you can support the show:
 
-- ☕ [Buy me a coffee](https://buymeacoffee.com/podcastmesm)
+- ☕ [Buy me a coffee](https://buymeacoffee.com/btspodcastph)
 - ▶ [YouTube](https://www.youtube.com/@marineearthscience)
 - 🎧 [Spotify](https://open.spotify.com/show/4NTLrSfceKjpFvZWflzBJj)
 - 📘 [Facebook](https://www.facebook.com/btspodcastph)
