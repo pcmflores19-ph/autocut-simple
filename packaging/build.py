@@ -39,7 +39,7 @@ ISCC_CANDIDATES = [
 ]
 
 # ffmpeg must be an LGPL build. The common "full" builds are GPL, which would
-# put stronger obligations on the installer for codecs Auto-Cut never uses.
+# put stronger obligations on the installer for codecs Wavefield never uses.
 FFMPEG_DIR = os.environ.get(
     "AUTOCUT_FFMPEG_DIR",
     os.path.join(os.path.expanduser("~"), "ffmpeg-lgpl", "bin"))

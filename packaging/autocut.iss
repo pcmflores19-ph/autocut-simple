@@ -1,4 +1,4 @@
-; Inno Setup script for the Auto-Cut Windows installer.
+; Inno Setup script for the Wavefield Windows installer.
 ;
 ; Build the app first, then compile this:
 ;     pyinstaller packaging/autocut.spec --noconfirm

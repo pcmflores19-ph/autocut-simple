@@ -98,7 +98,7 @@ named anything else will not be recognised.
 **Releases ▸ Draft a new release** on the repository page:
 
 - **Tag**: pick the `v1.1.0` you just pushed
-- **Title**: `Auto-Cut 1.1.0`
+- **Title**: `Wavefield 1.1.0`
 - **Attach the installer**: drag `AutoCut-Setup-1.1.0.exe` into the box. This
   matters — without an attached file people have to build it themselves.
 - **Publish release**

@@ -1,6 +1,6 @@
 # Developer notes
 
-Everything here is for people working on Auto-Cut's code. Users never need any
+Everything here is for people working on Wavefield's code. Users never need any
 of it - they run the installer, which bundles Python, ffmpeg and the plugins.
 
 ## Running from source

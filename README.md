@@ -81,13 +81,15 @@ second becomes track 2, and so on.
 Everyone's recording must start at the same moment, which is what OBS and
 Riverside give you automatically.
 
-### 2. Click Analyze
+### 2. Wait a moment
 
-Wavefield listens to every track and works out when each person is speaking.
+There's nothing to press. As soon as you add a recording, Wavefield reads it and
+works out when each person is speaking.
 
-The first time you do this on a file it has to read the whole recording, so give
-it a few minutes for an hour-long episode. After that it's quick. Watch the
-**LOG** panel on the left — it says what it's doing.
+The first time it sees a file it has to read the whole recording, so give it a
+few minutes for an hour-long episode. After that it's quick. The bar at the
+bottom of the window shows how it's getting on, and the **LOG** panel on the
+left says what it's doing.
 
 ### 3. Choose how aggressive to be
 
@@ -135,6 +137,10 @@ the same ones OBS gives you, with the same settings:
 It also installs **rnnoise**, which removes background hiss, fans and air
 conditioning. A good starting order for a voice: **rnnoise -> Noise Gate ->
 Compressor -> 3-Band EQ -> Limiter**.
+
+Once a track sounds right, save the chain with **Presets** at the bottom of the
+Effects window. It will be there for every future episode, so you only have to
+get it right once.
 
 Every setting has a box beside its slider, so you can type an exact value
 instead of trying to land on it by dragging.
@@ -207,7 +213,7 @@ and offers to recover everything if it ever crashes.
 Wavefield uses whatever speakers Windows is set to. Change it in Windows sound
 settings, then restart Wavefield.
 
-**Analyze seems stuck**
+**Reading the recordings seems stuck**
 The first pass on a long recording genuinely takes a few minutes. The LOG panel
 shows what is happening — if it is still moving, it is still working.
 
@@ -216,17 +222,22 @@ Drag across that part of the waveform and press `w` to put it back. Or move the
 DEAD AIR slider left, and it will be less aggressive everywhere.
 
 **It closed by itself**
-An audio effect can occasionally crash the program. There is a file called
-`autocut_crash.log` in the folder where Wavefield is installed — sending that
-makes it far easier to work out why.
+An audio effect can occasionally crash the program. Use **Help ▸ Report a
+problem** — it writes a file describing what went wrong, including the crash
+log, and opens the folder it saved to. Sending that makes it far easier to work
+out why.
 
 ---
 
 ## Transcripts
 
-Wavefield transcribes your episode automatically after you press Analyze, and
-can write subtitle files alongside your export. It handles 100 languages,
-including Filipino and Taglish.
+Press **Transcribe** and Wavefield asks which language and which model, then
+writes the transcript. It can write subtitle files alongside your export too,
+and handles 100 languages including Filipino and Taglish.
+
+It is a separate button rather than something that happens by itself, because
+it takes minutes even on a good graphics card and plenty of episodes never need
+one.
 
 The installer sets this up for you - leave the **"Set up speech recognition"**
 box ticked at the end of setup. It downloads about 2-3 GB and takes 5-15
