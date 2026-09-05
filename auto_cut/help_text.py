@@ -6,7 +6,7 @@ it - for anyone who gets a built copy rather than the repository, this is the
 only documentation there is.
 """
 
-from version import APP_NAME, SOURCE_CONTACT_URL, __version__
+from version import APP_NAME, SOURCE_URL, __version__
 
 QUICK_START = """\
 WHAT THIS IS FOR
@@ -88,15 +88,19 @@ talking, which removes bleed, breathing and keyboard noise from the idle mic.
 
 5. EFFECTS (OPTIONAL)
 
-Each track has its own VST3 chain, opened with its FX button. Plugin windows
-open separately and what you hear updates as you turn a knob.
+Each track has its own effects chain, opened with its FX button. What you hear
+updates as you move a slider.
 
-The installed version comes with a free voice chain already: rnnoise for noise
-suppression, ZamGate, ZamComp, ZamEQ2, ZamDynamicEQ, ZaMaximX2 and ZamNoise.
-Any VST3 plugin you install yourself shows up beside them.
+Six effects are built in - Noise Gate, Compressor, Expander, Limiter, 3-Band EQ
+and Gain - working the same way as the ones in OBS Studio, and starting from
+the same settings. rnnoise is bundled as a plugin for noise suppression, and
+any VST3 you install yourself appears alongside them.
 
-A sensible starting order for a voice is: rnnoise, then ZamGate, then ZamComp,
-then ZamEQ2, with ZaMaximX2 last to catch peaks.
+A sensible starting order for a voice is: rnnoise, then Noise Gate, then
+Compressor, then 3-Band EQ, with Limiter last to catch peaks.
+
+Once a chain sounds right, save it with Presets at the bottom of the window and
+load it again on the next episode instead of rebuilding it.
 
 Effects are rendered into the WAV export. They are NOT written into the Resolve
 timeline, which points at your untouched original recordings - do that side of
@@ -187,12 +191,15 @@ Free to use and to pass on.
 
 Built on ffmpeg, numpy, sounddevice and pedalboard.
 Transcription, when enabled, uses WhisperX.
-Bundled effects: rnnoise and ZamPlugins.
+Built-in effects (gate, compressor, expander, limiter, EQ, gain) are
+Wavefield's own, modelled on the ones in OBS Studio.
+Bundled plugin: rnnoise, for noise suppression.
 
 This program includes GPL-licensed components, so it is distributed under
-the GNU General Public License version 3. You may request the complete
-source code at
-{SOURCE_CONTACT_URL}
+the GNU General Public License version 3. That means you are free to read,
+change and share it. The complete source code is at
+
+{SOURCE_URL}
 
 See THIRD-PARTY-NOTICES.txt, installed alongside the program, for the
 licences of everything included.

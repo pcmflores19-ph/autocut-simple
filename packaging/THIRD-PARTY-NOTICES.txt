@@ -1,23 +1,25 @@
-Auto-Cut bundles third-party software. The components below keep their own
+Wavefield bundles third-party software. The components below keep their own
 licences.
 
 ==========================================================================
- WRITTEN OFFER FOR SOURCE CODE
+ WHERE TO GET THE SOURCE CODE
 ==========================================================================
 
 This program includes pedalboard and rnnoise, which are licensed under the
 GNU General Public License. The application as distributed is therefore
-covered by the GPL version 3.
+covered by the GPL version 3, and you are entitled to its complete
+corresponding source code.
 
-For a period of three years from the date you received this program, you may
-obtain the complete corresponding source code for it, and for the GPL
-components it contains, by sending a message to:
+It is published, in full, at:
 
-    Behind The Science Podcast
-    https://www.facebook.com/btspodcastph
+    https://github.com/pcmflores19-ph/wavefield
 
-The source will be provided at no charge beyond the cost of delivery.
-This offer is valid for anyone who receives a copy of this program.
+Every released version is tagged there, so the source matching the copy you
+are running can be downloaded directly. Nothing needs to be requested.
+
+If you cannot use GitHub and would rather ask, write to Behind The Science
+Podcast at https://www.facebook.com/btspodcastph and it will be sent to you
+at no charge beyond the cost of delivery.
 
 The source for the third-party components is also available directly from
 their own projects, at the addresses given below.
@@ -30,7 +32,7 @@ Source  : https://ffmpeg.org/
 Build   : https://github.com/BtbN/FFmpeg-Builds  (win64-lgpl)
 Full licence text: FFMPEG-LICENSE.txt, installed alongside this file.
 
-Auto-Cut runs these as separate programs; it does not link against FFmpeg.
+Wavefield runs these as separate programs; it does not link against FFmpeg.
 The binaries are unmodified. The complete corresponding source is available
 from ffmpeg.org and from the build project linked above.
 
@@ -46,11 +48,11 @@ rnnoise / noise-suppression-for-voice
 Unmodified binary from the project's own release, loaded at runtime as a
 plugin. The complete corresponding source is at the address above.
 
-The gate, compressor, expander, limiter, EQ and gain are Auto-Cut's own code
+The gate, compressor, expander, limiter, EQ and gain are Wavefield's own code
 (auto_cut/effects.py), ported from OBS Studio's filters - not bundled plugins.
 
 No freeware plugins are included. Free of charge is not the same as free to
-redistribute, and the ones used while developing Auto-Cut do not permit it.
+redistribute, and the ones used while developing Wavefield do not permit it.
 
 --------------------------------------------------------------------------
 Python packages
@@ -60,9 +62,9 @@ sounddevice  MIT               https://python-sounddevice.readthedocs.io/
 PortAudio    MIT               https://www.portaudio.com/
 pedalboard   GPL v3            https://github.com/spotify/pedalboard
 
-pedalboard is licensed GPL v3 and is imported by Auto-Cut, which is what
+pedalboard is licensed GPL v3 and is imported by Wavefield, which is what
 makes the distributed application as a whole subject to GPL v3. See the
-written offer at the top of this file for how to obtain the source.
+top of this file for where to obtain the source.
 
 --------------------------------------------------------------------------
 Optional, not bundled

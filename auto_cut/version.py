@@ -8,7 +8,11 @@ PROJECT_URL = "https://github.com/pcmflores19-ph/wavefield"
 
 # Wavefield bundles pedalboard and rnnoise, both GPL, so the built application
 # is GPL-3. That obliges us to make the source available to anyone who receives
-# the program. While the repository is private that is done with a written
-# offer (GPL-3 section 6(b)) naming this contact - the public podcast page, not
-# a personal address, because the notices file lands on every user's computer.
+# the program. The repository is public, so this is satisfied the easy way -
+# GPL-3 section 6(d), a public network location - and everyone can simply go
+# and read it. The written offer under section 6(b) that used to stand here was
+# only ever needed because the repository was private.
+SOURCE_URL = PROJECT_URL
+
+# Kept for anyone who cannot use GitHub and would rather ask a person.
 SOURCE_CONTACT_URL = "https://www.facebook.com/btspodcastph"
