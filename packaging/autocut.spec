@@ -22,6 +22,50 @@ SRC = os.path.join(BASE, "auto_cut")
 FFMPEG_DIR = os.environ.get("AUTOCUT_FFMPEG_DIR", r"C:\ffmpeg\bin")
 
 
+def _version_resource():
+    """
+    Writes the Windows version resource, and returns its path.
+
+    An .exe carrying no version information at all - no product name, no
+    company, no version - is a small antivirus heuristic in its own right, and
+    it is also what Explorer shows under Properties. Generated from version.py
+    so it cannot drift from the installer and the About box.
+
+    This is not a substitute for signing. It removes one free reason to be
+    suspicious of an unsigned binary, nothing more.
+    """
+    import re
+    text = open(os.path.join(SRC, "version.py"), encoding="utf-8").read()
+    version = re.search(r'__version__\s*=\s*"([^"]+)"', text).group(1)
+    parts = (version.split(".") + ["0", "0", "0", "0"])[:4]
+    quad = ", ".join(str(int(p)) for p in parts)
+
+    resource = """VSVersionInfo(
+  ffi=FixedFileInfo(
+    filevers=(QUAD), prodvers=(QUAD),
+    mask=0x3f, flags=0x0, OS=0x40004, fileType=0x1, subtype=0x0,
+    date=(0, 0)),
+  kids=[
+    StringFileInfo([StringTable('040904B0', [
+        StringStruct('CompanyName', 'Behind The Science Podcast'),
+        StringStruct('FileDescription', 'Wavefield - podcast post-production'),
+        StringStruct('FileVersion', 'VERSION'),
+        StringStruct('InternalName', 'Wavefield'),
+        StringStruct('OriginalFilename', 'Wavefield.exe'),
+        StringStruct('ProductName', 'Wavefield'),
+        StringStruct('ProductVersion', 'VERSION'),
+    ])]),
+    VarFileInfo([VarStruct('Translation', [1033, 1200])])
+  ]
+)
+""".replace("QUAD", quad).replace("VERSION", version)
+
+    path = os.path.join(SPECPATH, "version_info.txt")
+    with open(path, "w", encoding="utf-8") as handle:
+        handle.write(resource)
+    return path
+
+
 def _ffmpeg_binaries():
     """(source, dest) pairs for the two ffmpeg tools, if we can find them."""
     found = []
@@ -101,6 +145,7 @@ exe = EXE(
     bootloader_ignore_signals=False,
     strip=False,
     upx=False,                     # UPX compression is another antivirus trigger
+    version=_version_resource(),
     console=False,                 # a GUI app: no console window behind it
     icon=os.path.join(SPECPATH, "autocut.ico")
          if os.path.exists(os.path.join(SPECPATH, "autocut.ico")) else None,

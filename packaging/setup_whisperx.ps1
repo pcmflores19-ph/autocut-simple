@@ -154,25 +154,41 @@ if (-not (Test-Path $venvPy)) { throw "the environment is missing $venvPy" }
 
 & $venvPy -m pip install --upgrade pip --quiet
 
-# PyTorch first and explicitly: installed as a dependency of whisperx it comes
-# from PyPI, which on Windows is the CPU build - so a machine with a perfectly
-# good NVIDIA card would silently transcribe on the CPU, several times slower.
-Step "Installing PyTorch (the big one)"
-# --upgrade matters on a rerun: "pip install torch" with no version pin is a
-# no-op once any torch is already installed, even the wrong build for this
-# machine - pip does not know a different --index-url should mean a different
-# wheel. Without it, fixing GPU detection and running this again would not
-# actually replace a CPU torch that got installed by mistake the first time.
-if ($hasNvidia) {
-    & $venvPy -m pip install --upgrade torch torchaudio --index-url https://download.pytorch.org/whl/cu126
-} else {
-    & $venvPy -m pip install --upgrade torch torchaudio --index-url https://download.pytorch.org/whl/cpu
-}
-if ($LASTEXITCODE -ne 0) { throw "PyTorch failed to install" }
-
+# WhisperX first, PyTorch second - which looks backwards, and is the whole
+# point. whisperx pins a narrow torch range (torch~=2.8.0 at the time of
+# writing). Installing torch first, from the CUDA index, gets the newest CUDA
+# build; pip then hits that pin while installing whisperx, downgrades torch to
+# the version the pin allows, and takes it from PyPI - which on Windows is the
+# CPU build. The GPU torch is silently replaced by a CPU one, and the machine
+# transcribes several times slower with no error anywhere.
+#
+# So: let whisperx choose the versions, then swap those exact versions for
+# their CUDA equivalents. Nothing is pinned here, so this keeps working when
+# whisperx moves its requirement.
 Step "Installing WhisperX"
 & $venvPy -m pip install whisperx
 if ($LASTEXITCODE -ne 0) { throw "WhisperX failed to install" }
+
+if ($hasNvidia) {
+    Step "Switching PyTorch to the GPU build (the big download)"
+    $torchVer = (& $venvPy -c "import torch; print(torch.__version__.split('+')[0])").Trim()
+    $audioVer = (& $venvPy -c "import torchaudio; print(torchaudio.__version__.split('+')[0])").Trim()
+    Say "  matching what WhisperX asked for: torch $torchVer, torchaudio $audioVer"
+    # --no-deps because the CUDA wheels for Windows carry their CUDA libraries
+    # inside the wheel and declare the same Python dependencies as the CPU ones
+    # that whisperx just installed - so there is nothing else to resolve, and
+    # re-resolving would pull the whole tree again for no gain.
+    & $venvPy -m pip install --force-reinstall --no-deps `
+        "torch==$torchVer" "torchaudio==$audioVer" `
+        --index-url https://download.pytorch.org/whl/cu126
+    if ($LASTEXITCODE -ne 0) {
+        # Not fatal: a CPU torch still transcribes, just slowly. Failing here
+        # would throw away a working install over a speed problem.
+        Say ""
+        Say "  Could not fetch the GPU build of torch $torchVer." -ForegroundColor Yellow
+        Say "  WhisperX will still work, on the processor." -ForegroundColor Yellow
+    }
+}
 
 # ------------------------------------------------------------------- register
 Step "Telling Wavefield where it is"
