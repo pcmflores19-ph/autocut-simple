@@ -7,6 +7,7 @@ beneath them. There is only one page - exporting is a menu, not somewhere you
 navigate to.
 """
 
+import os
 import tkinter as tk
 from tkinter import messagebox, ttk
 
@@ -124,6 +125,8 @@ class UIBuilderMixin:
         menu.add_command(label="Troubleshooting",
                          command=lambda: self._show_help(
                              "Troubleshooting", help_text.TROUBLESHOOTING))
+        menu.add_command(label="Report a problem...",
+                         command=self.report_problem)
         menu.add_separator()
         menu.add_command(label="Check for updates",
                          command=self.check_for_updates)
@@ -137,6 +140,43 @@ class UIBuilderMixin:
 
         self.root.bind("<F1>", lambda e: self._show_help(
             "Keyboard shortcuts", help_text.SHORTCUTS))
+
+    def report_problem(self):
+        """
+        Writes a diagnostic file and shows the user where it went.
+
+        Asked for confirmation first, and told exactly what is being collected:
+        "diagnostics" is a word that has carried a lot of spyware over the
+        years, and someone who is already annoyed enough to report a bug should
+        not have to take it on trust.
+        """
+        import diagnostics
+
+        if not messagebox.askokcancel(
+                "Report a problem",
+                "This writes a file describing what went wrong, so it can be "
+                "fixed." + chr(10) * 2 +
+                "It records: the app version, your version of Windows, your "
+                "graphics card, whether speech recognition is set up, the "
+                "names and lengths of the recordings you have open, and the "
+                "log from this session." + chr(10) * 2 +
+                "It does NOT include your recordings, your transcript, or the "
+                "folders your files live in." + chr(10) * 2 +
+                "Nothing is sent anywhere. The file is saved on this computer "
+                "and it is up to you whether to send it."):
+            return
+
+        try:
+            path = diagnostics.write_report(self)
+        except Exception as exc:
+            messagebox.showerror(
+                "Could not write the report",
+                f"The report could not be saved:{chr(10) * 2}{exc}")
+            return
+
+        self.log(f"Wrote problem report: {os.path.basename(path)}")
+        if not diagnostics.reveal(path):
+            messagebox.showinfo("Report saved", f"Saved to:{chr(10)}{path}")
 
     def _show_help(self, title, body):
         """A read-only, scrollable, resizable text window."""
