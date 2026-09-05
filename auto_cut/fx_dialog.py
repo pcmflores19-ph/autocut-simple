@@ -21,7 +21,7 @@ from vst_host import discover_plugins, open_editor_subprocess
 
 class FxDialog(tk.Toplevel):
     def __init__(self, parent, track_name, chain, on_change=None, log=None,
-                 player=None):
+                 player=None, on_replace=None):
         super().__init__(parent)
         self.title(f"Effects - {track_name}")
         self.geometry("720x420")
@@ -31,6 +31,10 @@ class FxDialog(tk.Toplevel):
         self.on_change = on_change or (lambda: None)
         self.log = log or (lambda msg: None)
         self.player = player        # paused around plugin loads
+        # Called with a brand-new TrackChain when a preset replaces this one.
+        # The dialog cannot do the swap itself: the app owns the list of chains
+        # and the player owns the track, and both must be updated together.
+        self.on_replace = on_replace
         self.available = discover_plugins()
 
         self._build()
@@ -152,6 +156,125 @@ class FxDialog(tk.Toplevel):
                        "live to playback.",
                   foreground="#888").pack(side="left", padx=10)
         ttk.Button(bottom, text="Close", command=self.destroy).pack(side="right")
+
+        self.presets_button = ttk.Menubutton(bottom, text="Presets",
+                                             direction="above")
+        self.presets_button.pack(side="right", padx=(0, 6))
+        self._refresh_presets_menu()
+
+    # ---------- presets ----------
+
+    def _refresh_presets_menu(self):
+        """
+        Rebuilt every time it changes, because tk.Menu has no tidy way to
+        replace one section and the list is short.
+        """
+        import fx_presets
+
+        menu = tk.Menu(self.presets_button, **ui_theme.menu_options())
+        menu.add_command(label="Save this chain as a preset...",
+                         command=self._save_preset)
+
+        names = fx_presets.names()
+        if names:
+            menu.add_separator()
+            for name in names:
+                # describe() reads the file rather than loading any plugins, so
+                # building this menu never touches a VST3.
+                menu.add_command(
+                    label=f"{name}   ({fx_presets.describe(name)})",
+                    command=lambda n=name: self._load_preset(n))
+            menu.add_separator()
+            delete_menu = tk.Menu(menu, **ui_theme.menu_options())
+            for name in names:
+                delete_menu.add_command(
+                    label=name, command=lambda n=name: self._delete_preset(n))
+            menu.add_cascade(label="Delete", menu=delete_menu)
+        else:
+            menu.add_separator()
+            menu.add_command(label="(no presets saved yet)", state="disabled")
+
+        self.presets_button.configure(menu=menu)
+        self._presets_menu = menu       # keep a reference so tk cannot free it
+
+    def _save_preset(self):
+        import fx_presets
+        from tkinter import simpledialog
+
+        if not self.chain.slots:
+            messagebox.showinfo("Nothing to save",
+                                "Add an effect to the chain first.",
+                                parent=self)
+            return
+        name = simpledialog.askstring(
+            "Save preset",
+            "Name this chain, so you can use it again on the next episode:",
+            parent=self)
+        if not name or not name.strip():
+            return
+        name = name.strip()
+        if name in fx_presets.names() and not messagebox.askyesno(
+                "Replace preset?",
+                f'"{name}" already exists. Replace it?', parent=self):
+            return
+        if fx_presets.save(name, self.chain):
+            self.log(f'Saved preset "{name}": {self.chain.describe()}')
+            self._refresh_presets_menu()
+        else:
+            messagebox.showerror("Could not save",
+                                 "The preset file could not be written.",
+                                 parent=self)
+
+    def _load_preset(self, name):
+        """
+        Replaces this track's chain with the preset.
+
+        The chain object itself is swapped, so both the app's list and the
+        player's track have to be pointed at the new one - updating only one
+        leaves the audio callback mixing through the old chain, which sounds
+        like the preset silently did nothing.
+        """
+        import fx_presets
+
+        if self.chain.slots and not messagebox.askyesno(
+                "Replace the current chain?",
+                f'Loading "{name}" replaces the effects on this track.',
+                parent=self):
+            return
+
+        # Loading a VST3 while the audio stream is running is a native crash,
+        # so stop first - same reason _add_vst does.
+        if self.player is not None:
+            try:
+                self.player.stop()
+            except Exception:
+                pass
+
+        chain = fx_presets.load(name, log=self.log)
+        if chain is None:
+            messagebox.showerror("Preset missing",
+                                 f'"{name}" could not be read.', parent=self)
+            return
+
+        # Keep this track's own on/off state; the preset is a recipe, not a
+        # decision about whether effects are running.
+        chain.enabled = self.chain.enabled
+        if self.on_replace is not None:
+            self.on_replace(chain)
+        self.chain = chain
+        self.log(f'Loaded preset "{name}": {chain.describe()}')
+        self._refresh_chain()
+
+    def _delete_preset(self, name):
+        import fx_presets
+
+        if not messagebox.askyesno("Delete preset?",
+                                   f'Delete "{name}"? This cannot be undone.',
+                                   parent=self):
+            return
+        fx_presets.delete(name)
+        self.log(f'Deleted preset "{name}"')
+        self._refresh_presets_menu()
 
     # ---------- chain operations ----------
 

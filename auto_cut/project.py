@@ -12,6 +12,8 @@ them here would make projects enormous for no gain.
 """
 
 import base64
+
+import chain_io
 import json
 import os
 import time
@@ -20,63 +22,11 @@ FORMAT_VERSION = 2
 PROJECT_EXTENSION = ".autocut"
 
 
-def _chain_to_dict(chain):
-    """A VST chain as plugin paths plus each plugin's own serialized state."""
-    if chain is None:
-        return {"enabled": True, "slots": []}
-    slots = []
-    for slot in chain.slots:
-        if getattr(slot, "is_native", False):
-            # A built-in effect is just a key and some numbers - no plugin
-            # state to serialise, and it can never fail to reload.
-            slots.append({"kind": "native", "key": slot.key,
-                          "name": slot.name, "bypassed": slot.bypassed,
-                          "params": dict(slot.params)})
-            continue
-        try:
-            raw = base64.b64encode(slot.plugin.raw_state).decode("ascii")
-        except Exception:
-            raw = None      # plugin can't serialize; it'll load at defaults
-        slots.append({"kind": "vst3", "name": slot.name, "path": slot.path,
-                      "bypassed": slot.bypassed, "raw_state": raw})
-    return {"enabled": bool(chain.enabled), "slots": slots}
-
-
-def _chain_from_dict(data, log=None):
-    """Rebuilds a chain, skipping plugins that no longer load."""
-    import vst_host
-
-    chain = vst_host.TrackChain()
-    chain.enabled = bool(data.get("enabled", True))
-    for entry in data.get("slots", []):
-        if entry.get("kind") == "native":
-            try:
-                slot = chain.add_native(entry["key"], entry.get("params"))
-                slot.bypassed = bool(entry.get("bypassed"))
-            except Exception as exc:
-                if log:
-                    log(f"Effect skipped: {entry.get('name', '?')} ({exc})")
-            continue
-        path, name = entry.get("path"), entry.get("name", "?")
-        if not path or not os.path.exists(path):
-            if log:
-                log(f"Plugin missing, skipped: {name}")
-            continue
-        try:
-            slot = chain.add(name, path)
-        except Exception as exc:
-            if log:
-                log(f"Plugin failed to load, skipped: {name} ({exc})")
-            continue
-        slot.bypassed = bool(entry.get("bypassed"))
-        raw = entry.get("raw_state")
-        if raw:
-            try:
-                slot.apply_state(base64.b64decode(raw))
-            except Exception as exc:
-                if log:
-                    log(f"{name}: saved settings could not be restored ({exc})")
-    return chain
+# Chain (de)serialisation lives in chain_io now - presets need exactly the same
+# format, and one copy is the only way the two cannot drift apart. Re-exported
+# under the old names because app_actions calls _chain_from_dict directly.
+_chain_to_dict = chain_io.to_dict
+_chain_from_dict = chain_io.from_dict
 
 
 def build(app):

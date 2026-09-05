@@ -2035,8 +2035,23 @@ class AutoCutApp(UIBuilderMixin, ActionsMixin):
             # Keep the drawn waveform honest about what the chain is doing.
             self.refresh_waveform_for_chains()
 
+        def on_replace(chain):
+            """
+            A preset brought in a whole new chain.
+
+            Both references have to move together: track_chains is what gets
+            saved and redrawn, player.tracks[i].chain is what the audio callback
+            actually mixes through. Updating one and not the other is silent -
+            the effects list would show the preset while playback kept using the
+            old chain.
+            """
+            self.track_chains[index] = chain
+            if index < len(self.player.tracks):
+                self.player.tracks[index].chain = chain
+
         FxDialog(self.root, name, self.track_chains[index],
-                 on_change=on_change, log=self.log, player=self.player)
+                 on_change=on_change, log=self.log, player=self.player,
+                 on_replace=on_replace)
 
     def _choose_bookend(self, which):
         path = filedialog.askopenfilename(
