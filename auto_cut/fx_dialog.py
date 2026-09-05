@@ -148,19 +148,26 @@ class FxDialog(tk.Toplevel):
 
         bottom = ttk.Frame(self)
         bottom.grid(row=2, column=0, sticky="ew", padx=6, pady=(4, 6))
+
+        # Buttons before the caption. pack gives space in the order it is
+        # asked for, so a long label packed first takes the whole row and
+        # squeezes everything after it to a single pixel - which is exactly
+        # what had happened to Close, invisibly, until Presets landed beside
+        # it and made the bug obvious.
         ttk.Button(bottom, text="Open plugin GUI",
                    command=self._open_editor).pack(side="left")
+        ttk.Button(bottom, text="Close", command=self.destroy).pack(side="right")
+        self.presets_button = ttk.Menubutton(bottom, text="Presets  ▾",
+                                             style="Menu.TMenubutton",
+                                             direction="above")
+        self.presets_button.pack(side="right", padx=(0, 8))
+        self._refresh_presets_menu()
+
+        # Last, and allowed to be clipped: it is a hint, not a control.
         ttk.Label(bottom,
                   text="Built-in effects use the sliders above. Double-click a "
-                       "VST3 in the chain to open its own window. Changes apply "
-                       "live to playback.",
+                       "VST3 in the chain to open its own window.",
                   foreground="#888").pack(side="left", padx=10)
-        ttk.Button(bottom, text="Close", command=self.destroy).pack(side="right")
-
-        self.presets_button = ttk.Menubutton(bottom, text="Presets",
-                                             direction="above")
-        self.presets_button.pack(side="right", padx=(0, 6))
-        self._refresh_presets_menu()
 
     # ---------- presets ----------
 
